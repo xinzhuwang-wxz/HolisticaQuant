@@ -1,0 +1,43 @@
+# HolisticaQuant 依赖包
+
+# 核心依赖
+pandas>=2.0.0
+numpy>=1.24.0
+
+# LangChain相关
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-openai>=0.0.5
+langchain-anthropic>=0.1.0
+langgraph>=0.0.30
+
+# 数据源依赖
+# akshare - 用于获取市场数据和资金流数据
+akshare>=1.12.0
+
+# 网络请求
+aiohttp>=3.9.0
+requests>=2.31.0
+
+# 日志
+loguru>=0.7.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# 测试依赖
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# 其他工具
+pathlib2>=2.3.7; python_version < "3.4"
+
+# 异步工具
+nest_asyncio>=1.5.0  # 用于处理嵌套事件循环
+
+# 搜索工具（可选，用于web_search）
+# 注意：duckduckgo-search已重命名为ddgs
+ddgs>=0.1.0
+
+pydantic>=2.0.0
+

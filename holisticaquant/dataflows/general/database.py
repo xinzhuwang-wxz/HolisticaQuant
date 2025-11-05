@@ -10,11 +10,11 @@ from loguru import logger
 
 
 class DatabaseTool(GeneralToolBase):
-    """数据库查询工具
-    
-    这个工具可以查询内部数据库，获取结构化数据。
+    """数据库查询工具
+    
+    这个工具可以查询内部数据库，获取结构化数据。
     注意：需要配置数据库连接才能使用。
-    """
+    """
     name: str = "db_query"
     description: str = "查询数据库"
     
@@ -28,19 +28,19 @@ class DatabaseTool(GeneralToolBase):
         self.db_connection = db_connection
     
     async def execute(self, sql: str):
-        """安全地执行 SQL 查询
-        
+        """安全地执行 SQL 查询
+        
         Args:
             sql: SQL查询语句（仅支持SELECT）
             
         Returns:
             格式化的查询结果
-        """
-        # 验证 SQL 安全性
+        """
+        # 验证 SQL 安全性
         if not is_safe_query(sql):
             raise ValueError("Unsafe SQL query detected")
-        
-        # 执行查询
+        
+        # 执行查询
         if self.db_connection is None:
             logger.warning("数据库连接未配置，返回占位结果")
             return format_results("数据库连接未配置，请先配置数据库连接")
@@ -53,8 +53,8 @@ class DatabaseTool(GeneralToolBase):
             else:
                 # 如果是同步连接，使用同步执行
                 results = self.db_connection.execute(sql)
-        
-        # 格式化结果
+            
+            # 格式化结果
             return format_results(results)
         except Exception as e:
             logger.error(f"数据库查询失败: {e}")
