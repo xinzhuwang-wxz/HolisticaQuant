@@ -17,6 +17,10 @@ from holisticaquant.agents import (
     create_strategy_analyst,
 )
 from holisticaquant.graph.build_graph import build_mvp_graph
+from holisticaquant.agents.utils.debug_formatter import (
+    snapshot_state,
+    format_state_snapshot,
+)
 
 
 class HolisticaGraph:
@@ -110,6 +114,26 @@ class HolisticaGraph:
                 logger.info(f"  - 计划: {final_state['plan']['intent']}")
             if "strategy" in final_state and "recommendation" in final_state["strategy"]:
                 logger.info(f"  - 策略建议: {final_state['strategy']['recommendation']}")
+            metadata = final_state.get("metadata", {})
+            if metadata.get("tool_outputs"):
+                logger.info(f"  - 工具调用统计: { {agent: {tool: len(entries) for tool, entries in tools.items()} for agent, tools in metadata['tool_outputs'].items()} }")
+            if metadata.get("data_analysis_summary"):
+                logger.info(f"  - 数据分析摘要可用")
+            if metadata.get("strategy_summary"):
+                logger.info(f"  - 策略摘要可用")
+            summary_keys = [
+                "plan",
+                "collected_data",
+                "data_sufficiency",
+                "data_analysis",
+                "strategy",
+                "report",
+                "errors",
+                "trace",
+            ]
+            snapshot = snapshot_state(final_state, summary_keys)
+            if snapshot:
+                logger.info(format_state_snapshot("holistica_graph", "最终状态", snapshot))
         
         return final_state
     

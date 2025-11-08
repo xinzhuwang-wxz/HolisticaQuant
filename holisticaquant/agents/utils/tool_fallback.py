@@ -8,13 +8,13 @@ from typing import Dict, Any, Optional
 from loguru import logger
 
 
-def get_failing_tools(state: Dict[str, Any], failure_threshold: int = 3) -> list:
+def get_failing_tools(state: Dict[str, Any], failure_threshold: int = 2) -> list:
     """
     获取失败率高的工具列表
     
     Args:
         state: AgentState
-        failure_threshold: 失败次数阈值（默认3次）
+        failure_threshold: 失败次数阈值（默认2次）
         
     Returns:
         失败工具名称列表

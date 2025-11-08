@@ -7,8 +7,9 @@ Data Analyst Agent - 数据分析师
 3. 生成详细的数据分析报告（有数据支撑）
 """
 
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, List
 import json
+from datetime import datetime
 from pydantic import BaseModel
 from loguru import logger
 
@@ -45,6 +46,22 @@ class DataAnalyst(BaseAgent):
             tools=tools,
             config=config
         )
+    
+    def _get_state_keys_to_monitor(self) -> list[str]:
+        return [
+            "plan",
+            "collected_data",
+            "data_analysis",
+            "data_sufficiency",
+            "collection_iteration",
+            "metadata",
+        ]
+
+    def _get_state_input_keys(self) -> list[str]:
+        return ["query", "plan", "collected_data", "collection_iteration", "data_sufficiency"]
+
+    def _get_state_output_keys(self) -> list[str]:
+        return ["collected_data", "data_analysis", "data_sufficiency", "collection_iteration"]
     
     def _get_structured_output_schema(self) -> Optional[Type[BaseModel]]:
         """返回结构化输出Schema"""
@@ -168,12 +185,54 @@ class DataAnalyst(BaseAgent):
             logger.debug(f"data_analyst: 文本报告长度: {len(analysis_report)}")
             logger.debug(f"data_analyst: 文本报告前200字符: {analysis_report[:200]}")
         
-        # 合并新旧数据（避免重复）
-        if "collected_data" not in state:
-            existing_data = {}
-        else:
-            existing_data = state["collected_data"]
-        merged_data = {**existing_data, **tool_results}
+        # 整理工具摘要 -> collected_data（结构化）
+        metadata = state.setdefault("metadata", {})
+        tool_outputs_by_agent = (
+            metadata.get("tool_outputs", {}).get(self.name, {}) if metadata else {}
+        )
+        collected_data_struct: Dict[str, List[Dict[str, Any]]] = {}
+        tool_summary_lines: List[str] = []
+        for tool_name, entries in tool_outputs_by_agent.items():
+            sanitized_entries = []
+            for entry in entries:
+                sanitized_entries.append({
+                    "timestamp": entry.get("timestamp"),
+                    "arguments": entry.get("arguments"),
+                    "summary": entry.get("summary"),
+                })
+            if sanitized_entries:
+                collected_data_struct[tool_name] = sanitized_entries
+                latest_summary = sanitized_entries[-1].get("summary", "")
+                if latest_summary:
+                    tool_summary_lines.append(f"- **{tool_name}**：{latest_summary}")
+        # 如本轮执行工具但未能写入metadata（极少数异常），退回本次结果
+        if not collected_data_struct and tool_results:
+            for tool_name, result in tool_results.items():
+                collected_data_struct[tool_name] = [{
+                    "timestamp": datetime.now().isoformat(),
+                    "arguments": {},
+                    "summary": result,
+                }]
+                tool_summary_lines.append(f"- **{tool_name}**：{result}")
+
+        # 将工具摘要附加到分析报告（避免重复添加）
+        if tool_summary_lines and "### 数据收集概览" not in analysis_report:
+            tool_section = "\n\n### 数据收集概览\n" + "\n".join(tool_summary_lines)
+            analysis_report = analysis_report.rstrip() + tool_section
+
+        # 生成供前端消费的汇总信息
+        metadata["data_analysis_summary"] = {
+            "updated_at": datetime.now().isoformat(),
+            "tools": [
+                {
+                    "name": tool_name,
+                    "latest_summary": entries[-1].get("summary") if entries else "",
+                    "call_count": len(entries),
+                }
+                for tool_name, entries in collected_data_struct.items()
+            ],
+            "analysis_preview": analysis_report[:400],
+        }
         
         # 更新迭代次数
         if "collection_iteration" not in state:
@@ -202,7 +261,7 @@ class DataAnalyst(BaseAgent):
             logger.info(f"data_analyst: 数据充分性 - {data_sufficiency['sufficient']}, 置信度: {data_sufficiency['confidence']}")
         
         return {
-            "collected_data": merged_data,
+            "collected_data": collected_data_struct,
             "data_analysis": analysis_report,
             "data_sufficiency": data_sufficiency,
             "collection_iteration": collection_iteration,

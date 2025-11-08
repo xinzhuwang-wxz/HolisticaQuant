@@ -56,6 +56,15 @@ class StrategyAnalyst(BaseAgent):
         else:
             logger.info(f"strategy_analyst: Agentic RAG未启用")
     
+    def _get_state_keys_to_monitor(self) -> list[str]:
+        return ["plan", "data_analysis", "strategy", "report"]
+
+    def _get_state_input_keys(self) -> list[str]:
+        return ["query", "plan", "data_analysis", "strategy"]
+
+    def _get_state_output_keys(self) -> list[str]:
+        return ["strategy", "report"]
+    
     def _get_structured_output_schema(self) -> Optional[Type[BaseModel]]:
         """返回结构化输出Schema"""
         return StrategySchema
@@ -91,6 +100,19 @@ class StrategyAnalyst(BaseAgent):
         plan = state["plan"]
         data_analysis = state["data_analysis"]
         query = state["query"]
+        metadata = state.get("metadata", {})
+        data_analysis_summary = metadata.get("data_analysis_summary", {})
+        tool_summaries = data_analysis_summary.get("tools", []) if data_analysis_summary else []
+        tool_summary_text = ""
+        if tool_summaries:
+            tool_lines = []
+            for item in tool_summaries[:5]:
+                name = item.get("name")
+                latest = item.get("latest_summary")
+                if name and latest:
+                    tool_lines.append(f"- {name}：{latest}")
+            if tool_lines:
+                tool_summary_text = "\n\n数据收集摘要：\n" + "\n".join(tool_lines)
         
         # 检索相关历史洞见（如果启用Agentic RAG）
         insights_context = ""
@@ -127,6 +149,9 @@ class StrategyAnalyst(BaseAgent):
 
 数据分析报告：
 {data_analysis}"""
+
+        if tool_summary_text:
+            base_input += tool_summary_text
         
         # 如果有历史洞见，添加到上下文中
         if insights_context:
@@ -217,6 +242,19 @@ class StrategyAnalyst(BaseAgent):
             raise ValueError("strategy_analyst: 文本报告生成失败，LLM返回空内容。请检查工具调用结果和LLM配置。")
         
         strategy_report = text_content.strip()
+        metadata = state.setdefault("metadata", {})
+        tool_outputs_by_agent = (
+            metadata.get("tool_outputs", {}).get(self.name, {}) if metadata else {}
+        )
+        tool_insight_lines = []
+        for tool_name, entries in tool_outputs_by_agent.items():
+            if not entries:
+                continue
+            latest_summary = entries[-1].get("summary")
+            if latest_summary:
+                tool_insight_lines.append(f"- **{tool_name}**：{latest_summary}")
+        if tool_insight_lines and "### 市场补充信息" not in strategy_report:
+            strategy_report = strategy_report.rstrip() + "\n\n### 市场补充信息\n" + "\n".join(tool_insight_lines)
         
         if self.debug:
             logger.debug(f"strategy_analyst: 文本报告长度: {len(strategy_report)}")
@@ -277,6 +315,24 @@ class StrategyAnalyst(BaseAgent):
         
         if self.debug:
             logger.info(f"strategy_analyst: 策略生成完成 - {output_summary}")
+        
+        metadata["strategy_summary"] = {
+            "updated_at": datetime.now().isoformat(),
+            "recommendation": strategy_recommendation.get("recommendation"),
+            "confidence": strategy_recommendation.get("confidence"),
+            "target_price": strategy_recommendation.get("target_price"),
+            "position_suggestion": strategy_recommendation.get("position_suggestion"),
+            "time_horizon": strategy_recommendation.get("time_horizon"),
+            "report_preview": strategy_report[:400],
+            "tools": [
+                {
+                    "name": tool_name,
+                    "latest_summary": entries[-1].get("summary") if entries else "",
+                    "call_count": len(entries),
+                }
+                for tool_name, entries in tool_outputs_by_agent.items()
+            ],
+        }
         
         return {
             "strategy": strategy_recommendation,

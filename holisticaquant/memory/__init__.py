@@ -8,10 +8,12 @@ from .reasoning_engine import (
     FinancialReasoningEngine,
     FinancialInsight,
     FinancialInsightMemory,
+    MiniVectorStore,
 )
 
 __all__ = [
     "FinancialReasoningEngine",
     "FinancialInsight",
     "FinancialInsightMemory",
+    "MiniVectorStore",
 ]

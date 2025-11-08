@@ -24,7 +24,7 @@ class AgentState(TypedDict):
     plan: Annotated[Dict[str, Any], "plan_analyst输出的数据收集计划，包含time_range、intent、data_sources、focus_areas等字段"]
     
     # === dataTeam 输出 ===
-    collected_data: Annotated[Dict[str, str], "data_analyst收集的数据，键为工具名称，值为工具返回的字符串结果"]
+    collected_data: Annotated[Dict[str, List[Dict[str, Any]]], "data_analyst收集的数据，键为工具名称，值为同一工具多次调用的摘要列表（包含timestamp、arguments、summary）"]
     data_analysis: Annotated[str, "data_analyst生成的分析报告（Markdown格式）"]
     data_sufficiency: Annotated[Dict[str, Any], "数据充分性评估，包含sufficient(bool)、missing_data(list)、confidence(float)、reason(str)等字段"]
     collection_iteration: Annotated[int, "数据收集迭代次数"]
@@ -38,7 +38,7 @@ class AgentState(TypedDict):
     messages: Annotated[List[Any], "LangChain消息历史"]
     trace: Annotated[List[Dict[str, Any]], "思维链追踪，每个元素包含step、agent、action、output、error、timestamp等字段"]
     errors: Annotated[List[str], "错误列表"]
-    metadata: Annotated[Dict[str, Any], "额外元数据"]
+    metadata: Annotated[Dict[str, Any], "额外元数据（如tool_outputs、data_analysis_summary、strategy_summary）"]
 
 
 def create_empty_state(query: str, context: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> AgentState:

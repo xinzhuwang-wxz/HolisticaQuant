@@ -7,11 +7,14 @@
 3. 利用历史洞见改进策略生成
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set, Iterable, Tuple
 from datetime import datetime, timedelta
+from pathlib import Path
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
+
+from .mini_vector_store import MiniVectorStore
 
 
 class FinancialInsight:
@@ -22,7 +25,8 @@ class FinancialInsight:
         insight_type: str,  # market_trend, stock_pattern, risk_factor, strategy_pattern
         content: str,
         metadata: Dict[str, Any],
-        timestamp: Optional[str] = None
+        timestamp: Optional[str] = None,
+        vector_id: Optional[int] = None,
     ):
         self.insight_type = insight_type
         self.content = content
@@ -31,6 +35,7 @@ class FinancialInsight:
         self.relevance_score = 0.0  # 相关性分数，用于检索排序
         self.usage_count = 0  # 使用次数，用于评估洞见价值
         self.last_accessed: Optional[str] = None  # 最后访问时间
+        self.vector_id = vector_id
     
     def update_access(self):
         """更新最后访问时间"""
@@ -47,6 +52,7 @@ class FinancialInsight:
             "relevance_score": self.relevance_score,
             "usage_count": self.usage_count,
             "last_accessed": self.last_accessed,
+            "vector_id": self.vector_id,
         }
 
 
@@ -57,7 +63,14 @@ class FinancialInsightMemory:
     实现遗忘机制：基于时间、使用次数、总数限制
     """
     
-    def __init__(self, max_insights: int = 100, forget_days: int = 90):
+    def __init__(
+        self,
+        max_insights: int = 100,
+        forget_days: int = 90,
+        use_vector_store: bool = False,
+        vector_db_path: Optional[Path] = None,
+        embedding_model: Optional[str] = None,
+    ):
         """
         初始化记忆系统
         
@@ -70,10 +83,39 @@ class FinancialInsightMemory:
         self._forget_days = forget_days
         # 关键词索引：{ticker: [insight_ids], intent: [insight_ids]}
         self._keyword_index: Dict[str, Set[int]] = {}
+        self._id_map: Dict[int, FinancialInsight] = {}
+        self.vector_store: Optional[MiniVectorStore] = None
+        self.use_vector_store = use_vector_store and vector_db_path is not None
+
+        if self.use_vector_store:
+            try:
+                self.vector_store = MiniVectorStore(
+                    db_path=vector_db_path, model_name=embedding_model or "sentence-transformers/all-MiniLM-L6-v2"
+                )
+                self._load_from_vector_store()
+            except Exception as e:
+                logger.warning(f"Agentic RAG: 初始化向量存储失败，将回退到关键词检索。原因: {e}")
+                self.vector_store = None
+                self.use_vector_store = False
     
     def add_insight(self, insight: FinancialInsight):
         """添加金融洞见"""
         self._insights.append(insight)
+        vector_id = None
+        if self.vector_store:
+            try:
+                vector_id = self.vector_store.add(
+                    insight_type=insight.insight_type,
+                    content=insight.content,
+                    metadata=insight.metadata,
+                    timestamp=insight.timestamp,
+                )
+            except Exception as e:
+                logger.warning(f"Agentic RAG: 写入向量存储失败，将继续使用内存列表。原因: {e}")
+                vector_id = None
+        if vector_id is not None:
+            insight.vector_id = vector_id
+            self._id_map[vector_id] = insight
         
         # 更新关键词索引
         self._update_keyword_index(insight, len(self._insights) - 1)
@@ -117,10 +159,9 @@ class FinancialInsightMemory:
         
         # 删除旧洞见
         before_count = len(self._insights)
-        self._insights = [
-            insight for insight in self._insights
-            if insight.timestamp > cutoff_iso
-        ]
+        removed: List[FinancialInsight] = []
+        self._insights, removed = self._split_insights(lambda ins: ins.timestamp > cutoff_iso)
+        self._remove_from_vector_store(removed)
         
         # 重建索引
         self._rebuild_index()
@@ -146,7 +187,10 @@ class FinancialInsightMemory:
         )
         
         # 保留top N
-        self._insights = self._insights[:max_count]
+        kept = self._insights[:max_count]
+        removed = self._insights[max_count:]
+        self._insights = kept
+        self._remove_from_vector_store(removed)
         
         # 重建索引
         self._rebuild_index()
@@ -157,8 +201,11 @@ class FinancialInsightMemory:
     def _rebuild_index(self):
         """重建关键词索引"""
         self._keyword_index.clear()
+        self._id_map.clear()
         for idx, insight in enumerate(self._insights):
             self._update_keyword_index(insight, idx)
+            if insight.vector_id is not None:
+                self._id_map[insight.vector_id] = insight
     
     def search_insights(
         self,
@@ -180,7 +227,34 @@ class FinancialInsightMemory:
         Returns:
             相关金融洞见列表
         """
-        matched = []
+        if self.vector_store:
+            try:
+                vector_results = self.vector_store.similarity_search(
+                    query, top_k=top_k, insight_type=insight_type
+                )
+                matched_insights: List[FinancialInsight] = []
+                for vector_id, v_type, content, metadata, timestamp, score in vector_results:
+                    insight = self._id_map.get(vector_id)
+                    if insight is None:
+                        insight = FinancialInsight(
+                            insight_type=v_type,
+                            content=content,
+                            metadata=metadata,
+                            timestamp=timestamp,
+                            vector_id=vector_id,
+                        )
+                        self._insights.append(insight)
+                        self._update_keyword_index(insight, len(self._insights) - 1)
+                        self._id_map[vector_id] = insight
+                    insight.relevance_score = score
+                    insight.update_access()
+                    matched_insights.append(insight)
+                if matched_insights:
+                    return matched_insights[:top_k]
+            except Exception as e:
+                logger.warning(f"Agentic RAG: 向量检索失败，回退到关键词匹配。原因: {e}")
+
+        matched: List[FinancialInsight] = []
         matched_indices = set()
         
         # 优先匹配：如果有tickers，先通过索引查找
@@ -233,6 +307,51 @@ class FinancialInsightMemory:
         """获取所有金融洞见"""
         return self._insights.copy()
 
+    def _split_insights(self, predicate) -> Tuple[List[FinancialInsight], List[FinancialInsight]]:
+        kept: List[FinancialInsight] = []
+        removed: List[FinancialInsight] = []
+        for insight in self._insights:
+            if predicate(insight):
+                kept.append(insight)
+            else:
+                removed.append(insight)
+        return kept, removed
+
+    def _remove_from_vector_store(self, removed: Iterable[FinancialInsight]):
+        if not removed:
+            return
+        if self.vector_store:
+            ids = [ins.vector_id for ins in removed if ins.vector_id is not None]
+            if ids:
+                try:
+                    self.vector_store.delete_ids(ids)
+                except Exception as e:
+                    logger.warning(f"Agentic RAG: 删除向量数据失败: {e}")
+            for vector_id in ids:
+                if vector_id is not None:
+                    self._id_map.pop(vector_id, None)
+
+    def _load_from_vector_store(self):
+        if not self.vector_store:
+            return
+        try:
+            entries = self.vector_store.fetch_all()
+            for vector_id, insight_type, content, metadata, timestamp in entries:
+                insight = FinancialInsight(
+                    insight_type=insight_type,
+                    content=content,
+                    metadata=metadata,
+                    timestamp=timestamp,
+                    vector_id=vector_id,
+                )
+                self._insights.append(insight)
+            self._rebuild_index()
+            logger.info(f"Agentic RAG: 向量存储加载 {len(self._insights)} 条历史洞见")
+        except Exception as e:
+            logger.warning(f"Agentic RAG: 加载向量存储失败，将回退到内存列表。原因: {e}")
+            self.vector_store = None
+            self.use_vector_store = False
+
 
 class FinancialReasoningEngine:
     """金融推理引擎
@@ -252,9 +371,25 @@ class FinancialReasoningEngine:
         self.llm = llm
         self.config = config or {}
         rag_config = self.config.get("agentic_rag", {})
+        vector_cfg = rag_config.get("vector_store", {}) if isinstance(rag_config.get("vector_store", {}), dict) else {}
+        vector_enabled = vector_cfg.get("enabled", False)
+        vector_db_path = vector_cfg.get("db_path")
+        embedding_model = vector_cfg.get("model")
+
+        if vector_enabled and vector_db_path:
+            project_root = Path(self.config.get("project_root", "."))
+            vector_db_path = Path(vector_db_path)
+            if not vector_db_path.is_absolute():
+                vector_db_path = project_root / vector_db_path
+        else:
+            vector_db_path = None
+
         self.memory = FinancialInsightMemory(
             max_insights=rag_config.get("max_insights", 100),
-            forget_days=rag_config.get("forget_days", 90)
+            forget_days=rag_config.get("forget_days", 90),
+            use_vector_store=vector_enabled and vector_db_path is not None,
+            vector_db_path=vector_db_path,
+            embedding_model=embedding_model,
         )
         self.debug = self.config.get("debug", False)
         self.extract_enabled = rag_config.get("extract_insights", True)

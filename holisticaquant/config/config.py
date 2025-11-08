@@ -137,6 +137,17 @@ class GlobalConfig:
                 "max_insights": int(os.getenv("AGENTIC_RAG_MAX_INSIGHTS", "100")),
                 "forget_days": int(os.getenv("AGENTIC_RAG_FORGET_DAYS", "90")),
                 "extract_insights": os.getenv("AGENTIC_RAG_EXTRACT_INSIGHTS", "true").lower() == "true",
+                "vector_store": {
+                    "enabled": os.getenv("AGENTIC_RAG_VECTOR_STORE_ENABLED", "false").lower() == "true",
+                    "db_path": os.getenv(
+                        "AGENTIC_RAG_VECTOR_DB_PATH",
+                        "holisticaquant/memory/data/financial_insights.sqlite",
+                    ),
+                    "model": os.getenv(
+                        "AGENTIC_RAG_VECTOR_MODEL",
+                        "sentence-transformers/all-MiniLM-L6-v2",
+                    ),
+                },
             },
             
             # 项目路径

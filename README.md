@@ -26,7 +26,7 @@ query -> plan -> data -> strategy
 
 3. **策略团队（StrategyTeam）**
    - `strategy_analyst`: 基于数据分析报告和Agentic RAG历史洞见生成投资策略和建议
-   - 集成Agentic RAG：读取相关历史洞见，生成策略后保存新洞见（暂未实现）
+   - 集成Agentic RAG：可选启用轻量向量记忆（sqlite + sentence-transformers），自动检索历史洞见并沉淀新的策略洞察
    - 生成最终投资报告（包含宏观、微观、风险、建议等完整分析）
 
 ## 快速开始

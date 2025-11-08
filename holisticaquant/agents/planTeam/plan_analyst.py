@@ -36,6 +36,15 @@ class PlanAnalyst(BaseAgent):
             config=config
         )
     
+    def _get_state_keys_to_monitor(self) -> list[str]:
+        return ["query", "tickers", "plan"]
+
+    def _get_state_input_keys(self) -> list[str]:
+        return ["query"]
+
+    def _get_state_output_keys(self) -> list[str]:
+        return ["tickers", "plan"]
+    
     def _get_structured_output_schema(self) -> Optional[Type[BaseModel]]:
         """返回结构化输出Schema"""
         return PlanSchema

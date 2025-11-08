@@ -16,6 +16,15 @@ from pydantic import BaseModel
 from loguru import logger
 
 from .agent_states import AgentState, update_trace, add_error
+from .debug_formatter import (
+    snapshot_state,
+    format_state_snapshot,
+    format_agent_input_prompt,
+    format_tool_call,
+    format_tool_result,
+    format_state_updates,
+    format_state_diff,
+)
 
 # 工具结果截断配置（默认值，会被配置覆盖）
 MAX_TOOL_RESULT_LENGTH = 3000  # 每个工具结果最多3000字符
@@ -80,6 +89,49 @@ class BaseAgent(ABC):
         self.config = config or {}
         self.debug = self.config.get("debug", False)
     
+    def _get_state_keys_to_monitor(self) -> List[str]:
+        """返回需要追踪的state关键字段（用于前后对比）。"""
+        return ["query"]
+
+    def _get_state_input_keys(self) -> List[str]:
+        """返回本agent读取的state字段列表。"""
+        return ["query"]
+
+    def _get_state_output_keys(self) -> List[str]:
+        """返回本agent写入的state字段列表。"""
+        return []
+
+    def _store_tool_output(
+        self,
+        state: Optional[AgentState],
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        summary: str,
+        raw: str,
+    ):
+        """将工具输出写入state['metadata']['tool_outputs']，供后续agent复用。"""
+        if not state:
+            return
+        try:
+            metadata = state.setdefault("metadata", {})
+            tool_outputs = metadata.setdefault("tool_outputs", {})
+            agent_outputs = tool_outputs.setdefault(self.name, {})
+            entries = agent_outputs.setdefault(tool_name, [])
+            # 尽量保存可序列化的参数副本
+            try:
+                serialized_args = json.loads(json.dumps(tool_args, ensure_ascii=False, default=str))
+            except (TypeError, ValueError):
+                serialized_args = {k: str(v) for k, v in tool_args.items()}
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "arguments": serialized_args,
+                "summary": summary,
+                "raw": raw,
+            }
+            entries.append(entry)
+        except Exception as e:
+            logger.error(f"{self.name}: 记录工具输出失败: {e}")
+
     def handle_tool_calls(
         self,
         result: Any,
@@ -316,11 +368,13 @@ class BaseAgent(ABC):
                                     logger.debug(f"{self.name}: web_search query参数转换为字符串: {tool_args['query'][:100]}...")
                         
                         if self.debug:
-                            logger.info(f"{self.name}: 开始执行工具 {tool_name} with args {tool_args}")
+                            logger.info(format_tool_call(self.name, tool_name, tool_args))
                         tool_result = tool_func.invoke(tool_args)
                         
                         # 检查返回结果是否包含错误信息
                         result_str = str(tool_result)
+                        if self.debug:
+                            logger.info(format_tool_result(self.name, tool_name, result_str))
                         is_error = (
                             result_str.startswith("错误:") or 
                             result_str.startswith("错误") or
@@ -353,6 +407,8 @@ class BaseAgent(ABC):
                     except Exception as e:
                         error_msg = f"工具 {tool_name} 调用失败: {e}"
                         logger.error(f"{self.name}: {error_msg}")
+                        if self.debug:
+                            logger.info(format_tool_result(self.name, tool_name, f"错误: {error_msg}"))
                         
                         # 记录失败到metadata
                         if state and "metadata" in state:
@@ -391,6 +447,15 @@ class BaseAgent(ABC):
                                     f"{self.name}: 工具 {tool_name} 的结果过长（{len(result)}字符），"
                                     f"已截断为 {len(truncated_result)} 字符"
                                 )
+                        
+                        # 写入state的工具输出接口（摘要+原文）
+                        self._store_tool_output(
+                            state=state,
+                            tool_name=tool_name,
+                            tool_args=tool_call.get("args", {}),
+                            summary=truncated_result,
+                            raw=result,
+                        )
                         
                         # 创建工具消息（使用截断后的结果）
                         tool_message = ToolMessage(
@@ -444,7 +509,7 @@ class BaseAgent(ABC):
             tool_calls = final_result.tool_calls if hasattr(final_result, 'tool_calls') and final_result.tool_calls else []
             if tool_results or iteration >= max_iterations:
                 if self.debug:
-                    logger.warning(f"{self.name}: 最终结果没有content，强制生成内容（工具调用结果: {len(tool_results)}个，迭代次数: {iteration}）")
+                    logger.info(f"{self.name}: 最终结果没有content，触发兜底生成（工具调用结果: {len(tool_results)}个，迭代次数: {iteration}）")
                 # 最后一次调用，不绑定工具，强制生成文本
                 # 关键优化：使用工具结果摘要，而不是整个messages历史，避免token过多
                 chain = self._create_chain(self.llm)
@@ -669,8 +734,28 @@ class BaseAgent(ABC):
             # 1. 验证状态
             self._validate_state(state)
             
-            # 2. 构建用户输入
+            # 2. 记录输入快照与读取字段
+            monitor_keys = self._get_state_keys_to_monitor()
+            state_before_snapshot = snapshot_state(state, monitor_keys) if self.debug else {}
+            if self.debug and state_before_snapshot:
+                logger.info(format_state_snapshot(self.name, "输入快照", state_before_snapshot))
+
+            input_keys = self._get_state_input_keys()
+            if self.debug and input_keys:
+                input_snapshot = snapshot_state(state, input_keys)
+                if input_snapshot:
+                    logger.info(format_state_snapshot(self.name, "读取State字段", input_snapshot))
+                else:
+                    logger.info(f"🧩 Agent {self.name}: 读取State字段 {input_keys}（当前部分字段尚未写入）")
+
+            output_keys = self._get_state_output_keys()
+            if self.debug and output_keys:
+                logger.info(f"🎯 Agent {self.name}: 预计写入State字段 {output_keys}")
+
+            # 3. 构建用户输入
             user_input = self._get_user_input(state)
+            if self.debug and user_input:
+                logger.info(format_agent_input_prompt(self.name, user_input))
             
             # 4. 调用LLM
             if "messages" not in state:
@@ -942,6 +1027,13 @@ class BaseAgent(ABC):
             for key, value in updates.items():
                 if key != "output_summary":
                     state[key] = value
+            if self.debug:
+                if updates:
+                    logger.info(format_state_updates(self.name, updates))
+                state_after_snapshot = snapshot_state(state, monitor_keys)
+                logger.info(format_state_diff(self.name, state_before_snapshot, state_after_snapshot))
+                if updates.get("output_summary"):
+                    logger.info(f"📝 Agent {self.name} 输出摘要: {updates['output_summary']}")
             
             return state
             
