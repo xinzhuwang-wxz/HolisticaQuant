@@ -22,6 +22,8 @@ class AgentState(TypedDict):
     # === planTeam 输出 ===
     tickers: Annotated[List[str], "股票代码列表（6位数字），由plan_analyst提取并维护"]
     plan: Annotated[Dict[str, Any], "plan_analyst输出的数据收集计划，包含time_range、intent、data_sources、focus_areas等字段"]
+    scenario_type: Annotated[str, "场景类型：learning_workshop / research_lab / assistant"]
+    plan_target_id: Annotated[Optional[str], "计划推荐的目标ID（知识点或模板等）"]
     
     # === dataTeam 输出 ===
     collected_data: Annotated[Dict[str, List[Dict[str, Any]]], "data_analyst收集的数据，键为工具名称，值为同一工具多次调用的摘要列表（包含timestamp、arguments、summary）"]
@@ -72,6 +74,8 @@ def create_empty_state(query: str, context: Dict[str, Any], config: Optional[Dic
         "context": context,
         "tickers": [],  # 股票代码列表，由plan_analyst维护
         "plan": {},
+        "scenario_type": "research_lab",
+        "plan_target_id": None,
         "collected_data": {},
         "data_analysis": "",
         "data_sufficiency": {"sufficient": False, "missing_data": [], "confidence": 0.0, "reason": ""},

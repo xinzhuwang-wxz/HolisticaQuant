@@ -1,0 +1,43 @@
+export interface NavigationProps {
+  onNavigate: (page: 'landing' | 'learning' | 'research' | 'qa') => void
+}
+
+export interface TaskCard {
+  id: string
+  title: string
+  description: string
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  estimatedTime: string
+  category: string
+}
+
+export interface ResearchTemplate {
+  id: string
+  name: string
+  description: string
+  fields: TemplateField[]
+  icon: string
+}
+
+export interface TemplateField {
+  id: string
+  name: string
+  type: 'text' | 'number' | 'select' | 'date'
+  required: boolean
+  placeholder?: string
+  options?: string[]
+}
+
+export interface QAItem {
+  id: string
+  question: string
+  answer: string
+  sources: Source[]
+  timestamp: Date
+}
+
+export interface Source {
+  name: string
+  url: string
+  type: 'financial' | 'news' | 'report' | 'database'
+}

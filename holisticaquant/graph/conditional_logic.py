@@ -46,3 +46,16 @@ def should_collect_more_data(state: AgentState) -> Literal["collect_more", "cont
     
     return "continue"
 
+
+def determine_scenario_route(state: AgentState) -> Literal[
+    "learning_workshop", "research_lab", "assistant"
+]:
+    """
+    根据plan_analyst识别的场景类型决定路由。
+    默认回退到assistant，避免流程中断。
+    """
+    scenario_type = state.get("scenario_type") or "assistant"
+    if scenario_type not in {"learning_workshop", "research_lab", "assistant"}:
+        return "assistant"
+    return scenario_type
+

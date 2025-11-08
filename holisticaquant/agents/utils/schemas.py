@@ -11,6 +11,14 @@ from pydantic import BaseModel, Field
 class PlanSchema(BaseModel):
     """PlanAnalyst的结构化输出（简化版）"""
     
+    scenario_type: Literal["learning_workshop", "research_lab", "assistant"] = Field(
+        default="research_lab",
+        description="场景类型：learning_workshop（场景化学习工坊）、research_lab（全流程投研实验室）、assistant（AI 智能陪伴问答）"
+    )
+    target_id: Optional[str] = Field(
+        default=None,
+        description="针对特定场景的目标ID，例如学习工坊的知识点ID或投研实验室的模板ID"
+    )
     tickers: List[str] = Field(
         default_factory=list,
         description="股票代码列表（6位数字）。从用户查询中提取或通过web_search搜索获得。"
@@ -45,6 +53,8 @@ class PlanSchema(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
+                "scenario_type": "research_lab",
+                "target_id": "tesla_equity_valuation_2025",
                 "tickers": ["601857"],
                 "time_range": "last_30d"
             }
@@ -124,6 +134,101 @@ class StrategySchema(BaseModel):
                 "rationale": "基于技术面和基本面分析，建议买入",
                 "entry_conditions": ["股价回调至10.0元附近", "成交量温和放大"],
                 "exit_conditions": ["股价跌破9.5元止损位", "成交量突然放大但股价滞涨"]
+            }
+        }
+
+
+class LearningWorkshopSchema(BaseModel):
+    """LearningWorkshopAgent的结构化输出"""
+    
+    scenario_id: str = Field(description="学习场景ID，对应配置库中的唯一标识")
+    knowledge_point: str = Field(description="当前学习的知识点名称")
+    learning_objectives: List[str] = Field(
+        description="本次学习的核心目标",
+        default_factory=list
+    )
+    scenario_summary: str = Field(description="场景背景与关键说明")
+    key_data_points: List[str] = Field(
+        description="场景中需要关注的关键数据点摘要",
+        default_factory=list
+    )
+    task_steps: List[str] = Field(
+        description="完成任务所需的步骤（逐步指导）",
+        default_factory=list
+    )
+    calculator_inputs: List[str] = Field(
+        description="需要在内置计算器中输入的参数说明",
+        default_factory=list
+    )
+    expected_result: str = Field(description="任务预期结果或答案")
+    validation_logic: str = Field(description="验证结论的逻辑说明，包含数据来源")
+    ai_guidance: str = Field(description="AI 陪伴式总结与下一步建议")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "scenario_id": "blockchain_cbdc",
+                "knowledge_point": "区块链支付 / CBDC",
+                "learning_objectives": [
+                    "理解CBDC试点的目标与范围",
+                    "学会用收入增长率衡量数字化业务提升"
+                ],
+                "scenario_summary": "2025年中国央行在重点城市推动CBDC试点，聚焦跨境支付效率。",
+                "key_data_points": [
+                    "试点城市：上海、深圳、雄安等11城",
+                    "用户规模：超过1亿规模用户开通CBDC钱包"
+                ],
+                "task_steps": [
+                    "阅读CBDC试点核心数据",
+                    "在计算器输入试点前后收入数据",
+                    "计算并解释增长率"
+                ],
+                "calculator_inputs": [
+                    "试点前收入：10亿元",
+                    "试点后收入：12亿元"
+                ],
+                "expected_result": "数字化业务收入增长率 = (12-10)/10 = 20%",
+                "validation_logic": "结合2025Q1财报披露的数据，说明收入增长与CBDC提升体验的关系。",
+                "ai_guidance": "增长率合理，下一步可讨论支付效率与客户留存指标。"
+            }
+        }
+
+
+class AssistantAnswerSchema(BaseModel):
+    """SimpleAnswerAgent的结构化输出"""
+    
+    scenario_context: str = Field(description="当前问题所处的场景说明")
+    answer: str = Field(description="给用户的直接回答")
+    supporting_points: List[str] = Field(
+        description="支持回答的关键数据或逻辑",
+        default_factory=list
+    )
+    recommended_next_actions: List[str] = Field(
+        description="建议用户进行的后续动作",
+        default_factory=list
+    )
+    data_sources: List[str] = Field(
+        description="引用的数据来源或参考信息",
+        default_factory=list
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "scenario_context": "全流程投研实验室 - 特斯拉估值作业",
+                "answer": "特斯拉当前PE约为20，属于行业偏高区间。",
+                "supporting_points": [
+                    "当前股价约200美元，每股收益约10美元 → PE=20",
+                    "行业平均PE约15 → 高于行业均值"
+                ],
+                "recommended_next_actions": [
+                    "结合PEG指标评估成长性：PEG≈0.8",
+                    "跟踪销量增长是否符合25%的预期"
+                ],
+                "data_sources": [
+                    "新浪财经 2025-04-01 行情",
+                    "行业PE均值：内部资料（彭博行业研究 2025Q1）"
+                ]
             }
         }
 

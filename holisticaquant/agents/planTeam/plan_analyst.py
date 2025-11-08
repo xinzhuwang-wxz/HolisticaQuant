@@ -13,12 +13,17 @@ Plan Analyst Agent - 规划分析师（简化版）
 
 from typing import Dict, Any, Optional, Type
 import re
+import json
 from pydantic import BaseModel
 from loguru import logger
 
 from holisticaquant.agents.utils.base_agent import BaseAgent
 from holisticaquant.agents.utils.agent_states import AgentState
 from holisticaquant.agents.utils.schemas import PlanSchema
+from holisticaquant.memory.scenario_repository import (
+    get_learning_topic_summaries,
+    get_research_template_summaries,
+)
 # plan_analyst简化版：不使用工具，直接基于LLM知识库推测股票代码
 
 
@@ -37,13 +42,13 @@ class PlanAnalyst(BaseAgent):
         )
     
     def _get_state_keys_to_monitor(self) -> list[str]:
-        return ["query", "tickers", "plan"]
+        return ["query", "tickers", "plan", "scenario_type", "plan_target_id"]
 
     def _get_state_input_keys(self) -> list[str]:
         return ["query"]
 
     def _get_state_output_keys(self) -> list[str]:
-        return ["tickers", "plan"]
+        return ["tickers", "plan", "scenario_type", "plan_target_id"]
     
     def _get_structured_output_schema(self) -> Optional[Type[BaseModel]]:
         """返回结构化输出Schema"""
@@ -52,27 +57,66 @@ class PlanAnalyst(BaseAgent):
     def _get_system_message(self) -> str:
         """获取系统提示词"""
         return (
-            "你是金融分析规划助手。从用户查询中提取股票代码和时间范围。\n\n"
-            "流程：\n"
-            "1. 查询含6位数字代码 → 直接提取\n"
-            "2. 查询含公司名称 → 基于知识库推测股票代码（如：海陆重工→002255，中国石油→601857）\n"
-            "3. 查询含方向 → 返回空tickers列表（让data_analyst使用被动工具）\n\n"
-            "输出：tickers（6位数字列表，最多5支）、time_range（last_7d/last_30d/last_90d）\n"
-            "注意：如果无法确定股票代码，tickers可以为空列表[]"
+            "你是HolisticaQuant的场景规划助手，负责判别用户需求所属的核心场景，并给出初步计划。\n\n"
+            "可选场景：\n"
+            "1. learning_workshop（场景化学习工坊）：用户想通过“知识点+场景+任务”学习某个主题，例如“区块链支付”“CBDC”。\n"
+            "2. research_lab（全流程投研实验室）：用户要完成估值、行业分析、投研报告等，需要走 plan→data→strategy 流程。\n"
+            "3. assistant（AI 智能陪伴）：用户只想快速得到解释或问答，不需要完整流程。\n\n"
+            "输出要求：\n"
+            "- scenario_type：从上述三类中选择一个。\n"
+            "- target_id：若选择learning_workshop，则提供最匹配的知识点ID；若选择research_lab，则提供最匹配的模板ID；assistant时为null。\n"
+            "- tickers：仅在research_lab场景需要时填写6位股票代码列表（最多5个），其他场景可为空。\n"
+            "- time_range/intent/data_sources/focus_areas 按以往规范返回。\n\n"
+            "如果用户提到具体经济数据练习、课程作业或投研报告，则倾向于research_lab；\n"
+            "如果用户明确要学知识点、做实验任务，倾向于learning_workshop；\n"
+            "如果只是问问题或需要解释，选择assistant。"
         )
 
     def _get_user_input(self, state: AgentState, memory_context: str = "") -> str:
         """获取用户输入"""
         query = state["query"]
+        learning_topics = get_learning_topic_summaries()
+        research_templates = get_research_template_summaries()
         
         # 检查是否包含股票代码格式（6位数字）
         ticker_pattern = r'\b\d{6}\b'
         has_ticker_code = bool(re.search(ticker_pattern, query))
+
+        learning_text = (
+            json.dumps(learning_topics, ensure_ascii=False, indent=2)
+            if learning_topics
+            else "[]"
+        )
+        research_text = (
+            json.dumps(research_templates, ensure_ascii=False, indent=2)
+            if research_templates
+            else "[]"
+        )
+        
+        instruction = (
+            f"用户查询：{query}\n\n"
+            f"可选学习工坊场景（learning_workshop）：\n{learning_text}\n\n"
+            f"可选投研模板（research_lab）：\n{research_text}\n\n"
+            "请完成以下任务：\n"
+            "1. 判断用户查询最匹配的 scenario_type（learning_workshop / research_lab / assistant）。\n"
+            "2. 如果选择 learning_workshop，则挑选最相关的知识点ID作为 target_id；"
+            " 若无匹配则 target_id 为 null。\n"
+            "3. 如果选择 research_lab，则挑选最相关的模板ID作为 target_id，并尽量提供相关股票代码列表；"
+            " 若用户未给出股票代码，可根据常识推测（如“特斯拉”→无A股代码，tickers为空）。\n"
+            "4. 如果选择 assistant，则 target_id 为 null，tickers 也可为空。\n"
+            "5. time_range 根据查询推断（默认 last_30d）。\n"
+        )
         
         if has_ticker_code:
-            return f"用户查询：{query}\n\n查询含股票代码，直接提取6位数字代码和时间范围。"
+            instruction += (
+                "\n提示：查询中已包含股票代码，请在 tickers 中直接提取 6 位数字代码。"
+            )
         else:
-            return f"用户查询：{query}\n\n基于知识库推测股票代码（如：海陆重工→002255，中国石油→601857）。如果无法确定，tickers返回空列表[]。"
+            instruction += (
+                "\n提示：如果查询提到具体公司但无代码，可尝试推断A股代码；若无法确定，tickers留空。"
+            )
+        
+        return instruction
     
     def _get_continue_prompt(self) -> str:
         """获取继续处理的提示词"""
@@ -111,6 +155,8 @@ class PlanAnalyst(BaseAgent):
         
         # 转换为字典
         plan_dict = structured_data.model_dump()
+        scenario_type = plan_dict.get("scenario_type", "assistant") or "assistant"
+        target_id = plan_dict.get("target_id")
         
         # 验证并清理tickers：确保是股票代码格式（6位数字），不是公司名称
         if plan_dict.get("tickers"):
@@ -140,34 +186,21 @@ class PlanAnalyst(BaseAgent):
             
             plan_dict["tickers"] = cleaned_tickers
             
-            # 如果所有tickers都被过滤掉了，直接报错（不使用默认值）
-            if not cleaned_tickers:
-                error_msg = (
-                    f"plan_analyst: ⚠️ 所有tickers都不是有效的股票代码格式，tickers列表已为空！\n"
-                    f"  - 原始tickers: {plan_dict.get('tickers', [])}\n"
-                    f"  - 用户查询: {state.get('query', 'N/A')}\n"
-                    f"  - 结构化数据: {structured_data}\n"
-                    f"这可能导致后续数据收集失败。请检查LLM是否正确提取了股票代码。"
+            # 如果所有tickers都被过滤掉了，在research_lab场景下需要报错
+            if scenario_type == "research_lab" and not cleaned_tickers:
+                logger.warning(
+                    "plan_analyst: research_lab 场景下未能提取有效股票代码，将允许空列表（后续可能需要被动数据源或模板填充）。"
                 )
-                logger.error(error_msg)
-                raise ValueError("plan_analyst: 无法提取有效的股票代码。请检查用户查询是否包含股票代码或公司名称，以及LLM是否正确提取。")
         else:
             # 确保tickers字段存在
             plan_dict["tickers"] = []
             
-            # 如果tickers字段不存在或为空，直接报错（不使用默认值）
-            # 注意：方向性查询（如"推荐近期科技板块的股票"）可能允许tickers为空
-            # 但为了严格检查，如果查询明确提到股票或公司名，tickers应该不为空
-            query = state.get("query", "")
-            if query and any(keyword in query for keyword in ["股票", "代码", "公司", "股份", "投资", "分析"]):
-                error_msg = (
-                    f"plan_analyst: tickers列表为空，但查询似乎要求提取股票代码！\n"
-                    f"  - 用户查询: {query}\n"
-                    f"  - 结构化数据: {structured_data}\n"
-                    f"请检查LLM是否正确提取了股票代码。"
-                )
-                logger.error(error_msg)
-                raise ValueError("plan_analyst: 无法提取股票代码，但查询要求提取股票代码。请检查LLM是否正确提取。")
+            if scenario_type == "research_lab":
+                query_text = state.get("query", "")
+                if query_text and any(keyword in query_text for keyword in ["股票", "代码", "公司", "股份", "投资", "分析"]):
+                    logger.warning(
+                        "plan_analyst: research_lab 场景下未提取到股票代码，后续数据收集可能依赖被动工具或模板数据。"
+                    )
         
         # 确保time_range字段存在
         if "time_range" not in plan_dict or not plan_dict["time_range"]:
@@ -186,6 +219,8 @@ class PlanAnalyst(BaseAgent):
         
         # 输出摘要
         output_summary = (
+            f"场景: {scenario_type}, "
+            f"目标: {target_id or '无'}, "
             f"股票: {plan_dict['tickers']}, "
             f"时间范围: {plan_dict['time_range']}"
         )
@@ -196,6 +231,8 @@ class PlanAnalyst(BaseAgent):
         return {
             "tickers": plan_dict["tickers"],  # 顶层维护tickers
             "plan": plan_dict,  # plan字典也保留tickers（向后兼容）
+            "scenario_type": scenario_type,
+            "plan_target_id": target_id,
             "output_summary": output_summary,
         }
 

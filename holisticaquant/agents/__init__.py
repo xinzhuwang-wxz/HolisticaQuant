@@ -14,6 +14,8 @@ from holisticaquant.agents.utils.agent_states import (
 from holisticaquant.agents.planTeam.plan_analyst import create_plan_analyst
 from holisticaquant.agents.dataTeam.data_analyst import create_data_analyst
 from holisticaquant.agents.strategyTeam.strategy_analyst import create_strategy_analyst
+from holisticaquant.agents.learning.learning_workshop_agent import create_learning_workshop_agent
+from holisticaquant.agents.assistant.simple_answer_agent import create_simple_answer_agent
 
 __all__ = [
     # State管理
@@ -26,5 +28,7 @@ __all__ = [
     "create_plan_analyst",
     "create_data_analyst",
     "create_strategy_analyst",
+    "create_learning_workshop_agent",
+    "create_simple_answer_agent",
 ]
 

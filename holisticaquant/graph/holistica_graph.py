@@ -15,6 +15,8 @@ from holisticaquant.agents import (
     create_plan_analyst,
     create_data_analyst,
     create_strategy_analyst,
+    create_learning_workshop_agent,
+    create_simple_answer_agent,
 )
 from holisticaquant.graph.build_graph import build_mvp_graph
 from holisticaquant.agents.utils.debug_formatter import (
@@ -71,14 +73,18 @@ class HolisticaGraph:
         
         # 创建agents
         plan_analyst_node = create_plan_analyst(llm, config)
+        learning_workshop_node = create_learning_workshop_agent(llm, config)
         data_analyst_node = create_data_analyst(llm, config)
         strategy_analyst_node = create_strategy_analyst(llm, config, reasoning_engine)
+        simple_answer_node = create_simple_answer_agent(llm, config)
         
         # 构建图
         self.graph = build_mvp_graph(
             plan_analyst_node,
+            learning_workshop_node,
             data_analyst_node,
-            strategy_analyst_node
+            strategy_analyst_node,
+            simple_answer_node,
         )
     
     async def run_async(

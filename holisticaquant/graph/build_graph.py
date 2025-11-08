@@ -8,13 +8,18 @@ from langgraph.graph import StateGraph, END
 from typing import Callable
 
 from holisticaquant.agents import AgentState
-from holisticaquant.graph.conditional_logic import should_collect_more_data
+from holisticaquant.graph.conditional_logic import (
+    should_collect_more_data,
+    determine_scenario_route,
+)
 
 
 def build_mvp_graph(
     plan_analyst_node: Callable,
+    learning_workshop_node: Callable,
     data_analyst_node: Callable,
-    strategy_analyst_node: Callable
+    strategy_analyst_node: Callable,
+    simple_answer_node: Callable,
 ):
     """
     构建MVP工作流图
@@ -38,12 +43,24 @@ def build_mvp_graph(
     
     # 添加节点
     workflow.add_node("plan_analyst", plan_analyst_node)
+    workflow.add_node("learning_workshop_agent", learning_workshop_node)
     workflow.add_node("data_analyst", data_analyst_node)
     workflow.add_node("strategy_analyst", strategy_analyst_node)
+    workflow.add_node("simple_answer_agent", simple_answer_node)
     
     # 定义流程
     workflow.set_entry_point("plan_analyst")
-    workflow.add_edge("plan_analyst", "data_analyst")
+    workflow.add_conditional_edges(
+        "plan_analyst",
+        determine_scenario_route,
+        {
+            "learning_workshop": "learning_workshop_agent",
+            "research_lab": "data_analyst",
+            "assistant": "simple_answer_agent",
+        },
+    )
+    workflow.add_edge("learning_workshop_agent", END)
+    workflow.add_edge("simple_answer_agent", END)
     
     # 添加条件边：data_analyst 后判断是否需要继续收集
     workflow.add_conditional_edges(

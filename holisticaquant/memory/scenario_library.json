@@ -1,0 +1,111 @@
+{
+  "learning_workshop": {
+    "topics": [
+      {
+        "id": "blockchain_cbdc",
+        "title": "区块链支付 · CBDC 试点",
+        "knowledge_point": "区块链支付 / CBDC",
+        "category": ["支付科技", "央行数字货币"],
+        "scenario_summary": "2025 年中国人民银行在上海、深圳、雄安等重点城市推进 CBDC 试点，目标是提高跨境及零售支付效率，扩大用户渗透率并验证数字化货币的可行性。",
+        "key_data_points": [
+          {
+            "label": "试点城市数量",
+            "value": "11 个（上海、深圳、雄安、成都、北京等）",
+            "source": "中国人民银行 2025 年 3 月 CBDC 工作进展"
+          },
+          {
+            "label": "注册用户规模",
+            "value": "超过 1.1 亿钱包用户",
+            "source": "中国人民银行数字货币研究所 2025 年 4 月"
+          },
+          {
+            "label": "交易笔数",
+            "value": "累计 2.8 亿笔，金额 1.3 万亿元人民币",
+            "source": "上海 CBDC 试点办 2025Q1 报告"
+          }
+        ],
+        "learning_objectives": [
+          "理解 CBDC 试点的目标、范围与关键数据指标",
+          "学会使用收入增长率衡量数字化业务提升幅度",
+          "能够将场景化数据映射到金融业务影响分析"
+        ],
+        "task": {
+          "prompt": "计算 CBDC 试点后，该银行数字化业务收入的增长率，并解释增长原因。",
+          "calculator_inputs": [
+            {
+              "label": "试点前数字化收入",
+              "value": 10,
+              "unit": "亿元"
+            },
+            {
+              "label": "试点后数字化收入",
+              "value": 12,
+              "unit": "亿元"
+            }
+          ],
+          "formula": "增长率 = (试点后收入 - 试点前收入) / 试点前收入",
+          "expected_result": "增长率 = (12 - 10) / 10 = 0.2 = 20%",
+          "explanation": "收入增长主要源于 CBDC 提升了支付结算效率，带动数字化渠道交易量提升，并吸引更多对公、对私客户使用数字化服务。"
+        },
+        "validation": {
+          "reference_data": "该银行 2025Q1 财报显示数字化业务收入同比增长 19%~22%，与试点城市的交易增长相符。",
+          "insight": "CBDC 使得支付清算周期缩短 30%，在公对公快速付款场景中优势明显，帮助银行拓展增值服务收入。"
+        },
+        "recommended_followups": [
+          "分析 CBDC 对跨境支付业务的影响（手续费、到账时间）",
+          "评估 CBDC 推动的客户留存变化（活跃钱包数、复购率）"
+        ]
+      }
+    ]
+  },
+  "research_lab": {
+    "templates": [
+      {
+        "id": "tesla_equity_valuation_2025",
+        "title": "公司估值报告 · 特斯拉 2025",
+        "description": "针对特斯拉 2025 年的估值分析模板，聚焦盈利能力、行业对比与增长假设，适合课程作业或实战演练。",
+        "required_inputs": [
+          {
+            "field": "current_price",
+            "label": "当前股价",
+            "unit": "美元",
+            "source_hint": "实时行情 / data_analyst 工具"
+          },
+          {
+            "field": "eps",
+            "label": "每股收益（EPS）",
+            "unit": "美元",
+            "source_hint": "财报 / data_analyst 工具"
+          },
+          {
+            "field": "industry_pe",
+            "label": "行业平均 PE",
+            "unit": "",
+            "source_hint": "行业研究报告 / data_analyst 工具"
+          }
+        ],
+        "auto_metrics": [
+          {
+            "name": "pe",
+            "formula": "当前股价 / 每股收益",
+            "description": "衡量估值水平的基础指标"
+          },
+          {
+            "name": "peg",
+            "formula": "PE / 净利润增速",
+            "description": "考察估值与增长匹配度，可在后续步骤补充"
+          }
+        ],
+        "report_outline": [
+          "摘要：概述估值结论与风险提示",
+          "公司基本面：盈利结构、增长驱动因素",
+          "估值对比：与行业平均的差异与原因",
+          "风险分析：销量假设、成本控制、政策风险",
+          "投资建议：Buy/Hold/Sell 与关键监控指标"
+        ],
+        "default_conclusion": "在当前假设下，特斯拉 PE≈20，高于行业均值 15。若增长预期维持 25%，建议保持 Hold，并结合 PEG≈0.8 评估合理性。"
+      }
+    ]
+  }
+}
+
