@@ -53,8 +53,25 @@ cp .env.example .env
 python main.py "分析海陆重工的投资价值"
 ```
 
-
 **注意**：当前系统仅支持A股市场数据，请使用A股名称或股票代码（如 sh600588、sz002594 等）。
+
+### 4. 前端 `website/` 使用说明
+
+若需要运行前端展示站点，可在远程 `main` 检出 `website/` 后，按照下列步骤恢复依赖并启动：
+
+```bash
+# 进入前端目录
+cd /Users/physicsboy/Documents/GitHub/HolisticaQuant/website
+
+# 清理并重新安装全部依赖（包含 devDependencies）
+rm -rf node_modules package-lock.json
+npm install --include=dev
+
+# 启动开发服务器
+npm run dev
+```
+
+依赖安装完成后即可正常加载 `vite` 与 `postcss`。如在 Cursor 沙箱内运行仍无法访问本地端口，这是沙箱限制所致，可在本地终端直接执行 `npm run dev` 查看页面。
 
 ## 配置说明
 
