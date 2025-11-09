@@ -95,30 +95,78 @@ class SimpleAnswerAgent(BaseAgent):
         if self.debug:
             logger.debug("simple_answer_agent: 结构化输出 %s", data)
 
-        report_lines = [
-            "# AI 智能陪伴回答",
-            f"## 场景\n{data['scenario_context']}",
-            "## 回答",
-            data["answer"],
-            "\n## 支撑要点",
+        progress_queue = None
+        try:
+            progress_queue = state.get("context", {}).get("_progress_queue")
+        except Exception:
+            progress_queue = None
+
+        def _as_bullets(items: list[str]) -> str:
+            return "\n".join(f"• {item}" for item in items) if items else "（暂无）"
+
+        report_sections = [
+            f"【场景】\n{data['scenario_context']}",
+            f"【回答】\n{data['answer']}",
         ]
-        for point in data.get("supporting_points", []):
-            report_lines.append(f"- {point}")
+
+        if data.get("supporting_points"):
+            report_sections.append(f"【支撑要点】\n{_as_bullets(data['supporting_points'])}")
 
         if data.get("recommended_next_actions"):
-            report_lines.append("\n## 推荐的下一步行动")
-            for action in data["recommended_next_actions"]:
-                report_lines.append(f"- {action}")
+            report_sections.append(f"【下一步行动】\n{_as_bullets(data['recommended_next_actions'])}")
 
         if data.get("data_sources"):
-            report_lines.append("\n## 数据来源")
-            for source in data["data_sources"]:
-                report_lines.append(f"- {source}")
+            report_sections.append(f"【数据来源】\n{_as_bullets(data['data_sources'])}")
 
-        report = "\n".join(report_lines).strip()
+        report = "\n\n".join(section.strip() for section in report_sections if section).strip()
 
         metadata = state.setdefault("metadata", {})
         metadata["assistant_answer"] = data
+
+        if progress_queue:
+            try:
+                question = state.get("query", "")
+                if question:
+                    progress_queue.put_nowait(
+                        {
+                            "type": "timeline",
+                            "title": "解析问题",
+                            "content": question,
+                        }
+                    )
+
+                supporting = data.get("supporting_points") or []
+                if supporting:
+                    progress_queue.put_nowait(
+                        {
+                            "type": "timeline",
+                            "title": "要点梳理",
+                            "content": _as_bullets(supporting),
+                        }
+                    )
+
+                data_sources = data.get("data_sources") or []
+                if data_sources:
+                    progress_queue.put_nowait(
+                        {
+                            "type": "timeline",
+                            "title": "引用来源",
+                            "content": _as_bullets(data_sources),
+                        }
+                    )
+
+                next_actions = data.get("recommended_next_actions") or []
+                if next_actions:
+                    progress_queue.put_nowait(
+                        {
+                            "type": "timeline",
+                            "title": "行动建议",
+                            "content": _as_bullets(next_actions),
+                        }
+                    )
+            except Exception as exc:  # pragma: no cover - 仅记录调试信息
+                if self.debug:
+                    logger.warning(f"simple_answer_agent: 推送进度事件失败: {exc}")
 
         output_summary = f"assistant 回答: {data['answer'][:60]}..."
 

@@ -108,38 +108,22 @@ class LearningWorkshopAgent(BaseAgent):
         if self.debug:
             logger.debug("learning_workshop_agent: 结构化输出 %s", data)
 
-        report_lines = [
-            "# 场景化学习工坊",
-            f"## 知识点\n{data['knowledge_point']}",
-            "## 学习目标",
+        def _as_bullets(items: list[str]) -> str:
+            return "\n".join(f"• {item}" for item in items) if items else "（暂无）"
+
+        report_sections = [
+            f"【知识点】\n{data['knowledge_point']}",
+            f"【学习目标】\n{_as_bullets(data.get('learning_objectives', []))}",
+            f"【场景概要】\n{data['scenario_summary']}",
+            f"【关键数据】\n{_as_bullets(data.get('key_data_points', []))}",
+            f"【微型任务步骤】\n{_as_bullets(data.get('task_steps', []))}",
+            f"【计算器输入】\n{_as_bullets(data.get('calculator_inputs', []))}",
+            f"【预期结果】\n{data['expected_result']}",
+            f"【验证逻辑】\n{data['validation_logic']}",
+            f"【AI 指导】\n{data['ai_guidance']}",
         ]
-        report_lines.extend([f"- {item}" for item in data.get("learning_objectives", [])])
 
-        report_lines.append("\n## 场景概要")
-        report_lines.append(data["scenario_summary"])
-
-        report_lines.append("\n## 关键数据点")
-        for point in data.get("key_data_points", []):
-            report_lines.append(f"- {point}")
-
-        report_lines.append("\n## 微型任务步骤")
-        for step in data.get("task_steps", []):
-            report_lines.append(f"- {step}")
-
-        report_lines.append("\n## 计算器输入参数")
-        for param in data.get("calculator_inputs", []):
-            report_lines.append(f"- {param}")
-
-        report_lines.append("\n## 预期结果")
-        report_lines.append(data["expected_result"])
-
-        report_lines.append("\n## 验证逻辑")
-        report_lines.append(data["validation_logic"])
-
-        report_lines.append("\n## AI 指导")
-        report_lines.append(data["ai_guidance"])
-
-        report = "\n".join(report_lines).strip()
+        report = "\n\n".join(section.strip() for section in report_sections if section).strip()
 
         metadata = state.setdefault("metadata", {})
         metadata["learning_workshop"] = {

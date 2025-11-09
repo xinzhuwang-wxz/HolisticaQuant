@@ -6,13 +6,18 @@
 
 </div>
 
-## 系统架构
+## 场景概览
 
-```
-query -> plan -> data -> strategy
-```
+- **Landing Page 三大体验卡**
+  - Learning Studio：事件驱动的学习实验，支持预设题与自定义输入，流式展示推理过程。
+  - Research Lab：模板驱动的投研流水线，模板加载、变量推演、风险验证全链条可视。
+  - Q&A Engine：叙事流式的投研问答，示例与自定义一轨播报，实时引用与行动清单同步输出。
+- **主端产品页**
+  - `LearningStudio` 支持预设主题、用户自定义场景、WebSocket timeline 与类型writer 效果。
+  - `ResearchLab` 提供估值 / 行业 / 风险模板与自定义草稿，实时流式展示数据收集与策略生成。
+  - `QAEngine` 统一问答入口，示例与自定义问题共用 timeline，引用 / 要点 / 行动逐字播报。
 
-### 核心组件
+## 核心组件
 
 1. **计划团队（PlanTeam）**
    - `plan_analyst`: 分析用户查询，提取股票代码（6位数字），制定数据收集计划

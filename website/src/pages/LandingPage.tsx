@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { motion, useAnimation } from 'framer-motion'
-import MagneticButton from '../components/MagneticButton'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronDown } from 'lucide-react'
+import { ArrowRight, ChevronDown, Github } from 'lucide-react'
 
 const sectionVariants = {
   initial: { opacity: 0, y: 30 },
@@ -16,6 +15,37 @@ const LandingPage: React.FC = () => {
   const titleControls = useAnimation()
   const [breathing, setBreathing] = useState(false)
   const [activeDemo, setActiveDemo] = useState<'learning' | 'research' | 'companion' | null>(null)
+  const [showNav, setShowNav] = useState(false)
+  const [showScrollHint, setShowScrollHint] = useState(false)
+  const quickLinks = [
+    {
+      label: 'Learning',
+      onClick: () => handleScrollTo('scene-learning'),
+      accent: 'from-white/35 via-white/18 to-white/6 text-white/85 hover:text-white',
+    },
+    {
+      label: 'Research',
+      onClick: () => handleScrollTo('scene-research'),
+      accent: 'from-white/35 via-white/18 to-white/6 text-white/85 hover:text-white',
+    },
+    {
+      label: 'Q&A',
+      onClick: () => handleScrollTo('scene-qa'),
+      accent: 'from-white/35 via-white/18 to-white/6 text-white/85 hover:text-white',
+    },
+    {
+      label: 'Start Experience',
+      onClick: () => handleScrollTo('experience'),
+      accent: 'from-primary-400/65 via-primary-500/55 to-primary-500/40 text-white hover:text-white',
+    },
+  ]
+
+  const handleScrollTo = useCallback((targetId: string) => {
+    const target = document.getElementById(targetId)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [])
 
   const titleLayout = [
     { letters: 'Holistica'.split(''), anchorIndex: 4 },
@@ -26,7 +56,7 @@ const LandingPage: React.FC = () => {
     return layout.reduce((maxDelay, { letters, anchorIndex }, lineIdx) => {
       const lineDelay = lineIdx * 0.5
       const maxOffset = letters.reduce((acc, _, idx) => Math.max(acc, Math.abs(anchorIndex - idx)), 0)
-      const letterDelay = maxOffset * 0.08
+      const letterDelay = maxOffset * 0.18
       return Math.max(maxDelay, lineDelay + letterDelay)
     }, 0)
   }
@@ -34,21 +64,19 @@ const LandingPage: React.FC = () => {
   const letterVariants = {
     hidden: (custom: { offset: number }) => ({
       opacity: 0,
-      x: (custom?.offset ?? 0) * 36,
-      y: 20,
-      scale: 0.92,
-      filter: 'blur(14px)',
+      x: (custom?.offset ?? 0) * 22,
+      y: 12,
+      scale: 0.98,
     }),
     visible: (custom: { offset: number }) => ({
       opacity: 1,
       x: 0,
       y: 0,
       scale: 1,
-      filter: 'blur(0px)',
       transition: {
-        duration: 0.5,
+        duration: 2.2,
         ease: easeInOutCubic,
-        delay: Math.abs(custom?.offset ?? 0) * 0.08,
+        delay: Math.abs(custom?.offset ?? 0) * 0.18,
       },
     }),
   }
@@ -58,8 +86,8 @@ const LandingPage: React.FC = () => {
     visible: (custom: { lineIdx: number }) => ({
       opacity: 1,
       transition: {
-        delayChildren: (custom?.lineIdx ?? 0) * 0.5,
-        staggerChildren: 0.08,
+        delayChildren: (custom?.lineIdx ?? 0) * 0.32,
+        staggerChildren: 0.04,
       },
     }),
   }
@@ -195,7 +223,6 @@ const LandingPage: React.FC = () => {
     return (
       <div className="w-full h-full flex flex-col justify-center">
         <div className={`relative rounded-[32px] px-6 py-6 min-h-[360px] ${theme.cardClass}`}>
-          <div className={`absolute -top-3 left-6 px-3 py-1 rounded-full text-[0.65rem] uppercase tracking-[0.3em] ${theme.labelClass} bg-white/15`}>Prototype Sequence</div>
           <div className="flex flex-col gap-3 pt-6">
             {visibleMessages.map((msg, idx) => renderMessage(msg, `visible-${idx}`))}
             {typingMessage && renderMessage(typingMessage, 'typing', true)}
@@ -209,69 +236,148 @@ const LandingPage: React.FC = () => {
   }
 
   const LEARNING_DEMO_SCRIPT: DemoEntry[] = [
-    { role: 'user', content: '🔍 我想学习「区块链支付 / CBDC 试点」这个知识点。' },
-    { role: 'assistant', content: '📚 场景摘要：\n• 2025 重点城市：上海 / 深圳 / 成都\n• 数字钱包开通：1.1 亿\n• 交易笔数：2.8 亿\n以上数据来自课程内置资料包。' },
-    { role: 'user', content: '🧮 微型实验：输入数字化收入 10 亿 → 12 亿。' },
-    { role: 'assistant', content: '🧠 实验结论：数字化收入提升 20%。\n分析要点：\n1. 支付耗时缩短 30%\n2. 对公结算满意度 +12%\n3. 输出学习卡片与讨论问题。' },
-    { role: 'note', content: '步骤提示 · 关键指标 · 复盘建议' },
+    { role: 'user', content: '🔍 老师，我看到数字人民币扩围了，银行真的会赚更多吗？' },
+    {
+      role: 'assistant',
+      content:
+        '🌐 好敏锐！先看真实指标：2025 年 11 个试点城市、1.1 亿钱包、2.8 亿笔交易。想像你是数字化主管，第一反应会盯哪个指标？',
+    },
+    { role: 'user', content: '我会抓收入，看看试点前后差多少。' },
+    {
+      role: 'assistant',
+      content:
+        '🧮 正中靶心！试点前收入 10 亿，试点后 12 亿——增长率 = (12−10)/10 = **20%**。你觉得这个 20% 更像是渗透还是效率？',
+    },
+    { role: 'user', content: '渗透率吧，感觉更多人用了。' },
+    {
+      role: 'assistant',
+      content:
+        '✨ 你嗅到重点了！我们来个小实验：换个设定——钱包用户翻倍，但交易频次掉 20%。我们一起算看看。',
+    },
+    { role: 'user', content: '好呀，我猜增速会掉。' },
+    {
+      role: 'assistant',
+      content:
+        '🧠 模拟结果：增长率降到 **12%**。发现了吗？要跑赢市场，要同时提渗透、守活跃。最后，我们用财报数据验证：银行 2025Q1 数字化收入同比 +19%~22%，刚好在你推的区间。',
+    },
+    {
+      role: 'note',
+      content:
+        '✅ 小结：带着问题进场 → 换变量做实验 → 拿官方数据作证。Learning Studio 会把这套推理完整记到学习卡里。',
+    },
   ]
 
   const RESEARCH_DEMO_SCRIPT: DemoEntry[] = [
-    { role: 'user', content: '📝 启动模板：「公司估值报告」→ 特斯拉 2025。' },
-    { role: 'assistant', content: '📊 参数填充：\n• 股价：200 USD\n• EPS：10 USD\n• 行业 PE：15\n• 自定义假设：销量增长 25%，毛利率 18%。' },
-    { role: 'user', content: '🧾 请生成完整报告结构。' },
-    { role: 'assistant', content: '📑 报告草稿片段：\n1. 摘要：维持 Hold，目标价 215。\n2. 财务：PE 20｜PEG 0.8｜ROE 23%。\n3. 行业：高于同业均值 15 的合理性来自交付弹性。\n4. 风险：产能扩张、原材料、汇率。\n5. 下一步：跟踪 FCF、4680 电池进度。' },
-    { role: 'note', content: '模板参数 · 指标计算 · 风险清单' },
+    {
+      role: 'user',
+      content: '💡 想跑一下宁德时代的估值模板，看看现在价位到底稳不稳？',
+    },
+    {
+      role: 'assistant',
+      content:
+        '📈 好的！调用「公司估值报告」模板，加载最新 A 股指标：股价 180 元、EPS 6.8、行业 PE 24。你想先看估值对比还是做敏感性？',
+    },
+    {
+      role: 'user',
+      content: '先算当前 PE，再把利润增速调到 18%，感受一下安全边际。',
+    },
+    {
+      role: 'assistant',
+      content:
+        '🧮 当前 PE ≈ 26，比行业 24 略贵。利润增速降到 18% 时，PEG 拉到 1.4，安全边际明显收窄。要不要顺手看下储能业务翻倍后的上行空间？',
+    },
+    {
+      role: 'user',
+      content: '好呀，顺便看看行业雷达里算力渗透率的对比。',
+    },
+    {
+      role: 'assistant',
+      content:
+        '🔍 更新假设后模型给出目标价 205~215 元，行业雷达提示储能渗透率带来 15% 上行，风险雷达则把锂价、海外交付列为监控重点。要不要顺便生成敏感性矩阵？',
+    },
+    {
+      role: 'user',
+      content: '当然，做成投委会底稿最合适。',
+    },
+    {
+      role: 'note',
+      content: '✅ 模板拉通 → 变量实验 → 风险验证。估值草稿 + 敏感性矩阵 + 监控清单一键导出，投研小组直接接力。',
+    },
   ]
 
   const COMPANION_DEMO_SCRIPT: DemoEntry[] = [
-    { role: 'user', content: '💬 PE = 20 算高吗？' },
-    { role: 'assistant', content: '💡 结论：当前 PE 20，高于行业均值 15。支撑理由：\n• 新能源销量目标 +25%\n• 服务收入增速 +32%\n• 自由现金流转正。' },
-    { role: 'user', content: '🔁 如果销量没有达标呢？' },
-    { role: 'assistant', content: '🛡️ 情景分析：销量仅增 12% 时，模型给出 PE 合理区间 15~16，建议仓位下调 10%。' },
-    { role: 'assistant', content: '📎 数据出处：教学行情 2025-04-01；行业均值样本（12 家车企）；销售规划周报。' },
-    { role: 'note', content: '问答轨迹 · 数据引用 · 风险提醒' },
+    { role: 'user', content: '🧭 晨会要复盘国产 AI 服务器，先把示例流程播一遍？' },
+    {
+      role: 'assistant',
+      content:
+        '🎬 示例模式启动：① 行业逻辑（IDC 2025H1）② 资金信号（板块净流 +4%）③ 风险提示（锂价 & 交付）。流式字幕马上播。',
+    },
+    {
+      role: 'user', content: '客户刚问“今年毛利会不会被压扁”，能直接接到这条线上吗？' },
+    {
+      role: 'assistant',
+      content:
+        '🔁 已切到自定义轨道：加节点「采集毛利历史 → 引用厂商指引 → 输出监控指标」。保持同一 timeline，不丢上下文。',
+    },
+    { role: 'user', content: '每段播的时候把引用也念出来，投委会要看出处。' },
+    {
+      role: 'assistant',
+      content:
+        '📡 Timeline 正在播：工信部《算力白皮书 2025H1》、两家厂商 2025Q2 财报、IDC 预测。结论：毛利或压缩 1~1.5pct，可用服务化对冲，行动清单已同步。',
+    },
+    {
+      role: 'note',
+      content:
+        '✅ 示例速览 → 自定义追问 → 流式旁白 + 引用回放。问答结束即得到回答草稿、引用列表与动作清单。',
+    },
   ]
 
   useEffect(() => {
+    let navTimer: ReturnType<typeof setTimeout> | undefined
+    let hintTimer: ReturnType<typeof setTimeout> | undefined
+
     const runSequence = async () => {
+      setShowNav(false)
+      setShowScrollHint(false)
       await titleControls.start('visible')
       setBreathing(true)
       setActiveDemo('learning')
+      navTimer = setTimeout(() => setShowNav(true), 80)
+      hintTimer = setTimeout(() => setShowScrollHint(true), 340)
     }
 
     runSequence()
+
+    return () => {
+      if (navTimer) clearTimeout(navTimer)
+      if (hintTimer) clearTimeout(hintTimer)
+    }
   }, [titleControls])
 
   return (
     <div className="h-screen w-screen overflow-y-scroll snap-y snap-mandatory bg-gradient-to-br from-slate-50 via-white to-cyan-50/30">
       {/* Hero Section – Cinematic Brand Entry */}
-      <section className="relative h-screen snap-start overflow-hidden">
+      <section id="hero" className="relative h-screen snap-start overflow-hidden">
         {/* Atmospheric background */}
         <div className="absolute inset-0 noise-bg" />
         <div className="absolute inset-0 bg-gradient-to-br from-[#0A1A2F] via-[#0F2744] to-cyan-600/20" />
         {/* Cinematic fog intro */}
         <motion.div
           className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#040910] via-[#09172A] to-[#123456]"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: [1, 0.9, 0.55, 0.15, 0.05] }}
+          initial={{ opacity: 0.35 }}
+          animate={{ opacity: [0.35, 0.3, 0.22, 0.14, 0.08] }}
           transition={{ duration: 3.6, ease: easeInOutCubic }}
         />
-        <motion.div
+        <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(1200px 650px at 50% 45%, rgba(42,199,165,0.28) 0%, rgba(42,199,165,0.12) 40%, transparent 72%)' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.25, 0.6, 1] }}
-          transition={{ delay: 0.7, duration: 2.4, ease: easeInOutCubic }}
+          style={{ background: 'radial-gradient(1200px 650px at 50% 45%, rgba(42,199,165,0.2) 0%, rgba(42,199,165,0.08) 40%, transparent 72%)', opacity: 0.26 }}
         />
-        <motion.div
+        <div
           className="absolute inset-0 pointer-events-none"
-          initial={{ opacity: 0, scale: 1.25 }}
-          animate={{ opacity: [0, 0.3, 0], scale: [1.25, 1.08, 1] }}
-          transition={{ delay: 0.3, duration: 2.8, ease: easeInOutCubic }}
           style={{
-            background: 'radial-gradient(closest-side, rgba(255,255,255,0.6), rgba(255,255,255,0) 70%)',
-            filter: 'blur(90px)'
+            background: 'radial-gradient(closest-side, rgba(255,255,255,0.42), rgba(255,255,255,0) 70%)',
+            filter: 'blur(60px)',
+            opacity: 0.2
           }}
         />
 
@@ -288,6 +394,46 @@ const LandingPage: React.FC = () => {
         ))}
 
         <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">
+          {/* Frosted quick navigation */}
+          {showNav && (
+            <motion.nav
+              className="absolute top-8 left-8 z-20 hidden md:block"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: easeInOutCubic }}
+            >
+              <div className="flex flex-wrap gap-2.5">
+                {quickLinks.map((item, index) => (
+                  <motion.button
+                    key={item.label}
+                    onClick={item.onClick}
+                    className={`px-5 py-2.5 rounded-lg bg-gradient-to-br ${item.accent} shadow-[0_8px_26px_rgba(6,20,38,0.24)] text-[0.7rem] font-medium tracking-[0.12em] capitalize transition-all duration-300 hover:shadow-[0_12px_36px_rgba(14,38,70,0.3)] hover:-translate-y-[2px]`}
+                    style={{ backdropFilter: 'blur(10px)' }}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.06, duration: 0.24, ease: easeInOutCubic }}
+                  >
+                    {item.label}
+                  </motion.button>
+                ))}
+              </div>
+            </motion.nav>
+          )}
+          {showNav && (
+            <motion.a
+              href="https://github.com/xinzhuwang-wxz/HolisticaQuant"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute top-5 right-12 z-20 hidden md:flex items-center justify-center rounded-full w-10 h-10 bg-white/12 shadow-[0_8px_24px_rgba(6,20,38,0.24)] text-white hover:bg-white/18 transition-colors"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: easeInOutCubic, delay: quickLinks.length * 0.06 }}
+              style={{ backdropFilter: 'blur(10px)' }}
+            >
+              <Github className="w-5 h-5" />
+            </motion.a>
+          )}
+
           {/* Cinematic Title */}
           <motion.div
             className="relative w-full max-w-6xl mx-auto flex flex-col items-center min-h-[70vh]"
@@ -339,6 +485,11 @@ const LandingPage: React.FC = () => {
                   animate={titleControls}
                   custom={{ lineIdx }}
                   className="flex justify-center gap-[0.3em] text-[16vw] leading-none md:text-[9vw] font-display font-bold uppercase"
+                  style={
+                    lineIdx === 1
+                      ? { transform: 'translateX(-0.5rem)' }
+                      : { transform: 'translateX(0)' }
+                  }
                 >
                   {letters.map((char, charIdx) => (
                     <motion.span
@@ -348,7 +499,8 @@ const LandingPage: React.FC = () => {
                       className="text-transparent bg-clip-text"
                       style={{
                         backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(163,250,226,0.9) 35%, rgba(42,199,165,0.82) 70%, rgba(25,50,84,0.95))',
-                        textShadow: '0 35px 100px rgba(8,18,32,0.68), 0 18px 52px rgba(42,199,165,0.5), 0 0 22px rgba(255,255,255,0.75)'
+                        textShadow: '0 35px 100px rgba(8,18,32,0.68), 0 18px 52px rgba(42,199,165,0.5), 0 0 22px rgba(255,255,255,0.75)',
+                        willChange: 'opacity, transform'
                       }}
                     >
                       {char}
@@ -364,7 +516,7 @@ const LandingPage: React.FC = () => {
                   visible: {
                     opacity: 1,
                     y: 0,
-                    transition: { delay: lettersAppearDelay(titleLayout) + 0.25, duration: 0.9, ease: easeInOutCubic },
+                    transition: { delay: lettersAppearDelay(titleLayout) + 0.05, duration: 0.5, ease: easeInOutCubic },
                   },
                 }}
                 className="text-[3.6vw] md:text-[2.4rem] text-center tracking-[0.32em] uppercase"
@@ -381,17 +533,24 @@ const LandingPage: React.FC = () => {
           </motion.div>
 
           {/* Scroll hint */}
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-slate-300">
-            <div className="flex flex-col items-center">
-              <span className="text-sm mb-2">Welcome to Future</span>
-              <ChevronDown className="w-6 h-6 animate-bounce" />
-            </div>
-          </div>
+          {showScrollHint && (
+            <motion.div
+              className="absolute bottom-10 -translate-x-[72%] text-slate-300"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.36, ease: easeInOutCubic }}
+            >
+              <div className="flex flex-col items-center">
+                <span className="text-sm mb-1">Welcome to Future</span>
+                <ChevronDown className="w-6 h-6 animate-bounce" />
+              </div>
+            </motion.div>
+          )}
         </div>
       </section>
 
         {/* Scene 1 – Learning Studio */}
-      <section className="relative h-screen snap-start overflow-hidden">
+      <section id="scene-learning" className="relative h-screen snap-start overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#e8f6f1] via-[#f1f4ff] to-[#dcecf8]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(920px 540px at 22% 74%, rgba(46,180,160,0.22) 0%, transparent 70%)' }} />
 
@@ -412,27 +571,27 @@ const LandingPage: React.FC = () => {
                   事件驱动的学习实验室
                 </h2>
                 <p className="text-slate-600 leading-relaxed">
-                  让知识点与真实事件组合成“可练任务”，完成选题、实验、验证的闭环体验。
+                  事件驱动、变量实验、数据验证 —— 一条龙把抽象知识做成可练任务。
                 </p>
-                <ul className="space-y-3 text-slate-600">
-                  <li className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-teal-400/80" />
-                    <span>实时事件 + 微型实验 → 从“区块链支付 / CBDC” 中提炼任务与验证路径。</span>
+                <ul className="space-y-2 text-slate-600">
+                  <li className="flex items-center gap-4 pl-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-teal-400/80" />
+                    <span>事件信号：央行公告 + 行业快报秒变任务蓝图</span>
                   </li>
-                  <li className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-teal-400/80" />
-                    <span>AI 指导分步输入、计算、验证，强调“先理解，再动手”。</span>
+                  <li className="flex items-center gap-4 pl-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-teal-400/80" />
+                    <span>变量实验：调渗透率、调频次，立刻读出驱动因子</span>
                   </li>
-                  <li className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-teal-400/80" />
-                    <span>教学素材即可驱动体验，稍后接入真实数据源时无缝衔接。</span>
+                  <li className="flex items-center gap-4 pl-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-teal-400/80" />
+                    <span>验证快照：财报区间 + 旁路指标一屏对照</span>
                   </li>
                 </ul>
                 <div className="grid grid-cols-3 gap-3 pt-2">
                   {[
-                    { title: 'STEP 01', desc: '选择知识点' },
-                    { title: 'STEP 02', desc: '加载事件素材' },
-                    { title: 'STEP 03', desc: '动手实验 + 验证' },
+                    { title: 'STEP 01', desc: '锚定标的与模板' },
+                    { title: 'STEP 02', desc: '推演关键变量' },
+                    { title: 'STEP 03', desc: '生成验证快照' },
                   ].map((item) => (
                     <div key={item.title} className="rounded-xl bg-white shadow-[0_12px_35px_rgba(40,120,110,0.12)] border border-white/80 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.35em] text-primary-500/80">{item.title}</div>
@@ -450,7 +609,7 @@ const LandingPage: React.FC = () => {
       </section>
 
         {/* Scene 2 – Research Lab (Tension) */}
-      <section className="relative h-screen snap-start overflow-hidden">
+      <section id="scene-research" className="relative h-screen snap-start overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#e6efff] via-[#eef4ff] to-[#d9edff]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(120deg, rgba(120,170,250,0.22), transparent 62%), radial-gradient(920px 520px at 72% 38%, rgba(140,185,255,0.25) 0%, transparent 70%)' }} />
 
@@ -471,29 +630,29 @@ const LandingPage: React.FC = () => {
                   模板驱动的投研流水线
                 </h2>
                 <p className="text-slate-600 leading-relaxed">
-                  结构化模板贯穿「选题 → 数据 → 报告」，自动生成估值草稿、图表与风险提示。
+                  模板驱动的投研流水线：估值模板、行业雷达、风险雷达像投研小组一样接力出报告。
                 </p>
-                <ul className="space-y-3 text-slate-600">
-                  <li className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-sky-400/80" />
-                    <span>模板驱动：选题即生成所需参数、模型与报告框架。</span>
+                <ul className="space-y-2 text-slate-600">
+                  <li className="flex items-center gap-4 pl-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-sky-400/80" />
+                    <span>模板加载：宁德时代 / 中芯国际 / 璞泰来一键套入最新指标</span>
                   </li>
-                  <li className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-sky-400/80" />
-                    <span>教学行情 / 财务样例即可驱动体验，便于演示与评审。</span>
+                  <li className="flex items-center gap-4 pl-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-sky-400/80" />
+                    <span>变量推演：拖动利润、渗透率，立刻看到敏感性曲线</span>
                   </li>
-                  <li className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-sky-400/80" />
-                    <span>自动生成估值草稿、图表、风险提示，贴合真实投研节奏。</span>
+                  <li className="flex items-center gap-4 pl-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-sky-400/80" />
+                    <span>验证快照：财报区间、监管引用与监控清单自动生成</span>
                   </li>
                 </ul>
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="rounded-2xl bg-white/90 border border-white/70 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(30,70,140,0.18)]">
                     <div className="text-xs uppercase tracking-[0.35em] text-sky-600/80">Report Snapshot</div>
                     <div className="mt-3 text-sm leading-relaxed text-slate-700">
-                      • 摘要：维持 Hold，目标价 215。<br />
-                      • 指标：PE 20｜PEG 0.8｜ROE 23%。<br />
-                      • 风险：产能、原材料、汇率。
+                      • 摘要：维持增持，目标价 205~215。<br />
+                      • 指标：PE 26→24｜PEG 1.4→1.0。<br />
+                      • 风险：锂价波动、海外交付、汇率。
                     </div>
                   </div>
                   <div className="rounded-2xl bg-white/85 border border-white/60 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(30,70,140,0.15)]">
@@ -501,7 +660,7 @@ const LandingPage: React.FC = () => {
                     <ul className="mt-3 text-sm space-y-2 text-slate-700">
                       <li>① 读取模板参数</li>
                       <li>② 注入行情与财务假设</li>
-                      <li>③ 输出报告草稿 + 图表</li>
+                      <li>③ 输出估值草稿 + 风险清单</li>
                     </ul>
                   </div>
                 </div>
@@ -515,7 +674,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Scene 3 – Q&A Engine (Release) */}
-      <section className="relative h-screen snap-start overflow-hidden">
+      <section id="scene-qa" className="relative h-screen snap-start overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#f1e9ff] via-[#f5ecff] to-[#ece2ff]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(140deg, rgba(190,160,255,0.24), transparent 70%), radial-gradient(860px 520px at 38% 44%, rgba(210,190,255,0.22) 0%, transparent 74%)' }} />
 
@@ -533,36 +692,43 @@ const LandingPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6 text-slate-800">
                 <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900">
-                  讲逻辑、给数据的 AI 导师
+                  会讲故事的投研对话台
                 </h2>
                 <p className="text-slate-600 leading-relaxed">
-                  与学习、投研同步的问答助手，用“回答即解释”交付结论、数据与风险建议。
+                  同一条对话线里，先播示例、再接追问、最后沉淀行动，一次流式完成复盘。
                 </p>
                 <ul className="space-y-3 text-slate-600">
                   <li className="flex items-start gap-3">
                     <span className="mt-2 h-2 w-2 rounded-full bg-violet-400/80" />
-                    <span>场景感知：知道你正在处理哪段流程，回答直接指向当前任务。</span>
+                    <span>叙事流推演：问题 → 推理 → 行动的旁白节奏，同步展示引用出处。</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="mt-2 h-2 w-2 rounded-full bg-violet-400/80" />
-                    <span>输出格式统一包含结论、数据来源、逻辑链与建议动作。</span>
+                    <span>示例 + 自定义一轨：示例初稿秒出，紧接着把你的追问嵌入同一 timeline。</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="mt-2 h-2 w-2 rounded-full bg-violet-400/80" />
-                    <span>支持多轮追问，保留底稿，方便复盘与知识沉淀。</span>
+                    <span>底稿即成：回答草稿、引用列表、跟进行动自动归档，方便投委会复盘。</span>
                   </li>
                 </ul>
-                <div className="grid grid-cols-3 gap-4 pt-2">
-                  {[
-                    { label: '响应时间', value: '2.3s' },
-                    { label: '实时引用', value: '3 条' },
-                    { label: '建议强度', value: '中性偏多' },
-                  ].map((metric) => (
-                    <div key={metric.label} className="rounded-2xl bg-white/92 border border-white/70 backdrop-blur-md px-4 py-3 text-center shadow-[0_20px_55px_rgba(130,90,220,0.18)]">
-                      <div className="text-[0.65rem] uppercase tracking-[0.35em] text-violet-600/80">{metric.label}</div>
-                      <div className="mt-2 text-lg font-semibold text-slate-800">{metric.value}</div>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="rounded-2xl bg-white/92 border border-white/70 backdrop-blur-md p-4 shadow-[0_20px_55px_rgba(130,90,220,0.18)]">
+                    <div className="text-[0.65rem] uppercase tracking-[0.35em] text-violet-600/80">Answer Snapshot</div>
+                    <div className="mt-3 text-sm leading-relaxed text-slate-700">
+                      • 结论：AI 服务器毛利压缩 1~1.5pct，可用服务化对冲。<br />
+                      • 引用：工信部 2025H1｜中信纪要 2025Q2｜IDC 预测。<br />
+                      • 行动：盯 GPU 采购价、服务收入占比与海外交付节奏。
                     </div>
-                  ))}
+                  </div>
+                  <div className="rounded-2xl bg-white/88 border border-white/60 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(120,80,200,0.16)]">
+                    <div className="text-[0.65rem] uppercase tracking-[0.35em] text-violet-600/80">Live Timeline</div>
+                    <ul className="mt-3 text-sm space-y-2 text-slate-700">
+                      <li>① 提问解析</li>
+                      <li>② 播报示例答案</li>
+                      <li>③ 接入自定义追问</li>
+                      <li>④ 输出行动底稿</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
               <div>
@@ -576,7 +742,7 @@ const LandingPage: React.FC = () => {
       {/* Scene 4 – 已移除（App Ecosystem） */}
 
       {/* Scene 5 – Interactive Hub (Resonance & Closure) */}
-      <section className="relative h-screen snap-start overflow-hidden">
+      <section id="experience" className="relative h-screen snap-start overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#f4f6fb] via-[#edf4f2] to-[#f9f3ff]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(980px 540px at 62% 42%, rgba(180,230,220,0.22) 0%, transparent 70%)' }} />
 
@@ -592,7 +758,6 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto w-full px-6">
             <div className="text-center mb-10">
               <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900">Interactive Hub</h2>
-              <p className="mt-4 text-slate-600">作为收束与起点的三卡布局：Learning / Research / Q&A</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -610,29 +775,13 @@ const LandingPage: React.FC = () => {
                 >
                   <div className="text-xl font-semibold text-slate-900 mb-2">{card.title}</div>
                   <div className="text-slate-600 mb-6">{card.desc}</div>
-                  <button onClick={() => navigate(card.href)} className="px-5 py-2 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors inline-flex items-center gap-2">
+                    <button onClick={() => navigate(card.href)} className="px-5 py-2 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors inline-flex items-center gap-2">
                     Explore
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </motion.div>
               ))}
             </div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ delay: 0.6, duration: 0.8 }}
-              className="mt-10 text-center"
-            >
-              <MagneticButton className="inline-block">
-                <button
-                  onClick={() => navigate('/research')}
-                  className="px-8 py-4 bg-white/80 backdrop-blur-sm border-2 border-primary-200 text-primary-700 rounded-2xl font-semibold text-lg hover:bg-white/90 hover:border-primary-300 transition-all duration-300"
-                >
-                  Connect Backend →
-                </button>
-              </MagneticButton>
-            </motion.div>
           </div>
         </motion.div>
       </section>

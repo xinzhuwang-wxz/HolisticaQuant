@@ -7,6 +7,7 @@ Data Analyst Agent - 数据分析师
 3. 生成详细的数据分析报告（有数据支撑）
 """
 
+import asyncio
 from typing import Dict, Any, Optional, Type, List
 import json
 from datetime import datetime
@@ -215,12 +216,48 @@ class DataAnalyst(BaseAgent):
                 }]
                 tool_summary_lines.append(f"- **{tool_name}**：{result}")
 
+        # 若存在进度队列，推送实时事件
+        progress_queue = None
+        try:
+            progress_queue = state.get("context", {}).get("_progress_queue")
+        except Exception:
+            progress_queue = None
+
+        if tool_summary_lines and progress_queue:
+            try:
+                summary_plain = []
+                for line in tool_summary_lines:
+                    plain = line.replace("- **", "• ").replace("**：", "：").replace("**", "")
+                    summary_plain.append(plain)
+                progress_queue.put_nowait(
+                    {
+                        "type": "timeline",
+                        "title": "数据收集",
+                        "content": "\n".join(summary_plain),
+                    }
+                )
+            except Exception as exc:
+                if self.debug:
+                    logger.warning(f"data_analyst: 推送数据收集进度失败: {exc}")
+
         # 将工具摘要附加到分析报告（避免重复添加）
         if tool_summary_lines and "### 数据收集概览" not in analysis_report:
             tool_section = "\n\n### 数据收集概览\n" + "\n".join(tool_summary_lines)
             analysis_report = analysis_report.rstrip() + tool_section
 
         # 生成供前端消费的汇总信息
+        highlight_candidates = []
+        for raw_line in analysis_report.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith(("###", "##")):
+                highlight_candidates.append(stripped.lstrip("#").strip())
+            elif stripped.startswith(("*", "-", "•")):
+                highlight_candidates.append(stripped.lstrip("*-• ").strip())
+            if len(highlight_candidates) >= 6:
+                break
+
         metadata["data_analysis_summary"] = {
             "updated_at": datetime.now().isoformat(),
             "tools": [
@@ -232,7 +269,28 @@ class DataAnalyst(BaseAgent):
                 for tool_name, entries in collected_data_struct.items()
             ],
             "analysis_preview": analysis_report[:400],
+            "highlights": highlight_candidates,
+            "full_report": analysis_report,
         }
+
+        if progress_queue:
+            try:
+                analysis_excerpt = analysis_report.strip()
+                if analysis_excerpt:
+                    analysis_excerpt = analysis_excerpt.replace("###", "").replace("**", "")
+                    max_len = 420
+                    if len(analysis_excerpt) > max_len:
+                        analysis_excerpt = analysis_excerpt[: max_len - 1].rstrip() + "…"
+                    progress_queue.put_nowait(
+                        {
+                            "type": "timeline",
+                            "title": "数据分析",
+                            "content": analysis_excerpt,
+                        }
+                    )
+            except Exception as exc:
+                if self.debug:
+                    logger.warning(f"data_analyst: 推送数据分析进度失败: {exc}")
         
         # 更新迭代次数
         if "collection_iteration" not in state:

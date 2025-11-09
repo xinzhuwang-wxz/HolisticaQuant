@@ -10,6 +10,7 @@ Strategy Analyst Agent - 策略分析师
 
 from typing import Dict, Any, Optional, Type
 import json
+import re
 from pydantic import BaseModel
 from datetime import datetime
 from loguru import logger
@@ -80,7 +81,7 @@ class StrategyAnalyst(BaseAgent):
             "**可用工具（仅限以下1个）**：\n"
             "1. web_search - 网络搜索工具，用于补充最新市场动态或行业趋势\n\n"
             "**严格禁止**：\n"
-            "- **禁止调用任何数据收集工具**：如get_stock_fundamental、get_stock_market_data、get_market_data、get_sina_news等。这些工具是data_analyst使用的，你不需要调用。\n"
+            "- **禁止调用任何被动数据收集工具**：如get_stock_fundamental、get_stock_market_data、get_market_data、get_sina_news等。这些工具是data_analyst使用的，你不需要调用。只能调用web_search工具。\n"
             "- **禁止调用任何未列出的工具**：只使用web_search工具。如果尝试调用其他工具会报错。\n\n"
             "**报告结构（5部分）**：\n"
             "1. 宏观市场分析（市场走势、情绪、宏观环境）\n"
@@ -316,6 +317,20 @@ class StrategyAnalyst(BaseAgent):
         if self.debug:
             logger.info(f"strategy_analyst: 策略生成完成 - {output_summary}")
         
+        strategy_highlights: list[str] = []
+        for raw_line in strategy_report.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith(("###", "##")):
+                strategy_highlights.append(stripped.lstrip("#").strip())
+            elif stripped.startswith(("*", "-", "•")):
+                strategy_highlights.append(stripped.lstrip("*-• ").strip())
+            elif stripped.startswith(("建议", "结论", "风险")):
+                strategy_highlights.append(stripped)
+            if len(strategy_highlights) >= 6:
+                break
+
         metadata["strategy_summary"] = {
             "updated_at": datetime.now().isoformat(),
             "recommendation": strategy_recommendation.get("recommendation"),
@@ -324,6 +339,8 @@ class StrategyAnalyst(BaseAgent):
             "position_suggestion": strategy_recommendation.get("position_suggestion"),
             "time_horizon": strategy_recommendation.get("time_horizon"),
             "report_preview": strategy_report[:400],
+            "highlights": strategy_highlights,
+            "full_report": strategy_report,
             "tools": [
                 {
                     "name": tool_name,
@@ -355,40 +372,72 @@ def _generate_final_report(
     注意：strategy_report本身已经是一个完整的投资策略报告（包含标题、宏观、微观、风险、建议等），
     这里只添加必要的元数据（查询、计划概览、数据分析摘要），不重复添加投资建议部分。
     """
-    # 构建报告头部（元数据）
-    report = f"""# 投资策略报告
+    def _markdown_to_plain(text: str) -> str:
+        lines: list[str] = []
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                lines.append("")
+                continue
 
-## 用户查询
-{query}
+            heading_match = re.match(r"^(#{1,6})\s*(.+)$", stripped)
+            if heading_match:
+                content = heading_match.group(2).strip()
+                lines.append(f"【{content}】")
+                continue
 
----
+            if stripped.startswith(("- ", "* ")):
+                lines.append(f"• {stripped[2:].strip()}")
+                continue
 
-## 执行计划概览
-- **关注股票**：{', '.join(state.get('tickers', []) or plan.get('tickers', []) or ['无'])}
-- **时间范围**：{plan.get('time_range', 'last_30d')}
-- **需求意图**：{plan.get('intent', '投资分析')}
-- **数据源**：{', '.join(plan.get('data_sources', [])) if plan.get('data_sources') else '未指定'}
-- **重点关注**：{', '.join(plan.get('focus_areas', [])) if plan.get('focus_areas') else '未指定'}
+            lines.append(stripped)
+        # 移除首尾空行
+        while lines and not lines[0]:
+            lines.pop(0)
+        while lines and not lines[-1]:
+            lines.pop()
+        return "\n".join(lines)
 
---------------------------------
+    _ = data_analysis  # 保留参数以兼容调用方，实际展示由前端处理
+    plain_strategy = _markdown_to_plain(strategy_report)
+    conclusion_segments: list[str] = []
 
-## 数据分析摘要
+    recommendation = strategy_recommendation.get("recommendation")
+    if recommendation:
+        conclusion_segments.append(f"建议：{recommendation}")
 
-{data_analysis}
+    confidence = strategy_recommendation.get("confidence")
+    if confidence is not None:
+        try:
+            conclusion_segments.append(f"置信度：{confidence:.0%}")
+        except Exception:
+            conclusion_segments.append(f"置信度：{confidence}")
 
+    target_price = strategy_recommendation.get("target_price")
+    if target_price:
+        conclusion_segments.append(f"目标价：{target_price}")
 
---------------------------------
+    position_suggestion = strategy_recommendation.get("position_suggestion")
+    if position_suggestion:
+        conclusion_segments.append(f"仓位建议：{position_suggestion}")
 
-## 投资策略分析
+    time_horizon = strategy_recommendation.get("time_horizon")
+    if time_horizon:
+        conclusion_segments.append(f"持有周期：{time_horizon}")
 
-{strategy_report}
+    summary_line = " | ".join(conclusion_segments) if conclusion_segments else "建议：请参考策略详情"
 
---------------------------------
+    report_sections = [
+        f"【投资结论】\n{summary_line}",
+        f"【策略详情】\n{plain_strategy or '（当前暂无可用的策略详情）'}",
+        f"【生成时间】\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    ]
 
-*报告生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
-"""
-    
-    return report
+    # 保留查询信息供前端展示
+    if query:
+        report_sections.insert(0, f"【用户需求】\n{query.strip()}")
+
+    return "\n\n".join(report_sections).strip()
 
 
 def create_strategy_analyst(llm, config=None, reasoning_engine=None):

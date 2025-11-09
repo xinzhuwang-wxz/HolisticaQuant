@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from holisticaquant.config.config import get_config
 from holisticaquant.graph import HolisticaGraph
@@ -57,6 +58,275 @@ class QueryResponse(BaseModel):
     )
 
 
+def _markdown_to_readable(text: str) -> str:
+    if not text:
+        return ""
+
+    lines: List[str] = []
+    for raw in str(text).splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            lines.append("")
+            continue
+        if stripped.startswith("#"):
+            stripped = stripped.lstrip("#").strip()
+            lines.append(stripped)
+            continue
+        if stripped.startswith(("- ", "* ", "• ")):
+            lines.append(f"• {stripped[2:].strip()}")
+            continue
+        lines.append(stripped)
+
+    cleaned: List[str] = []
+    previous_blank = False
+    for line in lines:
+        if not line:
+            if previous_blank:
+                continue
+            previous_blank = True
+            cleaned.append("")
+        else:
+            previous_blank = False
+            cleaned.append(line)
+
+    return "\n".join(cleaned).strip()
+
+
+async def _execute_query(graph: HolisticaGraph, payload: QueryRequest) -> QueryResponse:
+    if graph is None:
+        raise RuntimeError("Graph not initialized")
+
+    context = payload.context.copy() if payload.context else {}
+    context.setdefault("trigger_time", datetime.now().strftime("%Y-%m-%d %H:00:00"))
+
+    state = await graph.run_async(query=payload.query, context=context)
+
+    if payload.scenario_override:
+        state["scenario_type"] = payload.scenario_override
+
+    metadata = jsonable_encoder(state.get("metadata", {}) or {})
+    if isinstance(metadata, dict) and payload.context:
+        template_type = payload.context.get("template_type")
+        if template_type and "template_type" not in metadata:
+            metadata["template_type"] = template_type
+        cta_label = payload.context.get("cta_label")
+        if cta_label and "cta_label" not in metadata:
+            metadata["cta_label"] = cta_label
+
+    scenario_type = state.get("scenario_type", "assistant")
+    plan = jsonable_encoder(state.get("plan") or {}) or None
+    tickers = jsonable_encoder(state.get("tickers", []) or [])
+    plan_target_id = state.get("plan_target_id")
+    report = state.get("report") or ""
+
+    data_summary = metadata.get("data_analysis_summary") if isinstance(metadata, dict) else {}
+    strategy_summary = metadata.get("strategy_summary") if isinstance(metadata, dict) else {}
+
+    final_report_source = state.get("report") or report
+    if scenario_type == "research_lab" and isinstance(strategy_summary, dict):
+        final_report_source = strategy_summary.get("full_report") or final_report_source
+
+    readable_report = _markdown_to_readable(final_report_source)
+    if not readable_report:
+        readable_report = _markdown_to_readable(report)
+
+    segments: Dict[str, Any] = {}
+    learning_block = metadata.get("learning_workshop") if isinstance(metadata, dict) else None
+    if learning_block:
+        segments["learning_workshop"] = learning_block
+
+    assistant_answer = metadata.get("assistant_answer") if isinstance(metadata, dict) else None
+    if assistant_answer:
+        if isinstance(assistant_answer, dict):
+            assistant_copy = assistant_answer.copy()
+            for field in ("answer", "analysis", "draft"):
+                if isinstance(assistant_copy.get(field), str):
+                    assistant_copy[field] = _markdown_to_readable(assistant_copy[field])
+            segments["assistant_answer"] = assistant_copy
+        else:
+            segments["assistant_answer"] = assistant_answer
+
+    if isinstance(data_summary, dict) and data_summary:
+        data_full_report = data_summary.get("full_report") or state.get("data_analysis")
+        if data_full_report:
+            segments["data_analysis"] = _markdown_to_readable(data_full_report)
+        if data_summary.get("highlights"):
+            segments["data_highlights"] = data_summary.get("highlights")
+        if data_summary.get("tools"):
+            segments["data_tools"] = data_summary.get("tools")
+    elif state.get("data_analysis"):
+        segments["data_analysis"] = _markdown_to_readable(state.get("data_analysis"))
+
+    if isinstance(strategy_summary, dict) and strategy_summary:
+        strategy_copy = strategy_summary.copy()
+        if isinstance(strategy_copy.get("full_report"), str):
+            strategy_copy["full_report"] = _markdown_to_readable(strategy_copy["full_report"])
+        segments["strategy"] = strategy_copy
+
+    if state.get("strategy"):
+        segments["strategy_structured"] = state.get("strategy")
+
+    if state.get("data_sufficiency"):
+        segments["data_sufficiency"] = state.get("data_sufficiency")
+
+    segments = {k: jsonable_encoder(v) for k, v in segments.items() if v}
+    trace = jsonable_encoder(state.get("trace")) if payload.return_trace else None
+
+    return QueryResponse(
+        scenario_type=scenario_type,
+        plan=plan,
+        tickers=tickers,
+        plan_target_id=plan_target_id,
+        report=readable_report,
+        metadata=metadata,
+        segments=segments,
+        trace=trace,
+    )
+
+
+def _extract_report_sections(report: str) -> Dict[str, str]:
+    sections: Dict[str, str] = {}
+    current_key: Optional[str] = None
+    buffer: List[str] = []
+
+    for raw_line in report.splitlines():
+        line = raw_line.strip()
+        if not line and not buffer:
+            continue
+        if line.startswith("【") and "】" in line:
+            if current_key is not None:
+                sections[current_key] = "\n".join(buffer).strip()
+            buffer = []
+            closing_index = line.find("】")
+            current_key = line[1:closing_index]
+            remainder = line[closing_index + 1 :].strip()
+            if remainder:
+                buffer.append(remainder)
+            continue
+        if current_key is not None:
+            buffer.append(line)
+
+    if current_key is not None:
+        sections[current_key] = "\n".join(buffer).strip()
+
+    return sections
+
+
+def _format_highlights(highlights: List[str]) -> str:
+    lines = [f"• {item.strip()}" for item in highlights if isinstance(item, str) and item.strip()]
+    return "\n".join(lines)
+
+
+def _build_learning_timeline_events(response: QueryResponse) -> List[Dict[str, str]]:
+    events: List[Dict[str, str]] = []
+    metadata = response.metadata if isinstance(response.metadata, dict) else {}
+
+    if response.scenario_type == "research_lab":
+        plan = response.plan if isinstance(response.plan, dict) else {}
+        plan_summary = plan.get("intent") or plan.get("summary")
+        if plan_summary:
+            events.append({"type": "timeline", "title": "规划完成", "content": str(plan_summary)})
+
+        data_summary = metadata.get("data_analysis_summary") if isinstance(metadata, dict) else None
+        if isinstance(data_summary, dict) and data_summary:
+            collected = data_summary.get("tools")
+            if isinstance(collected, list) and collected:
+                lines = []
+                for item in collected:
+                    name = item.get("name")
+                    summary = item.get("latest_summary")
+                    if name and summary:
+                        readable = _markdown_to_readable(str(summary))
+                        max_len = 240
+                        if len(readable) > max_len:
+                            readable = readable[: max_len - 1].rstrip() + "…"
+                        lines.append(f"• {name}：{readable}")
+                if lines:
+                    events.append({
+                        "type": "timeline",
+                        "title": "数据收集",
+                        "content": "\n".join(lines),
+                    })
+            preview = data_summary.get("analysis_preview") or data_summary.get("full_report")
+            if preview:
+                readable_preview = _markdown_to_readable(str(preview))
+                events.append({
+                    "type": "timeline",
+                    "title": "数据分析",
+                    "content": readable_preview,
+                })
+
+        strategy_summary = metadata.get("strategy_summary") if isinstance(metadata, dict) else None
+        if isinstance(strategy_summary, dict) and strategy_summary:
+            preview = strategy_summary.get("report_preview") or strategy_summary.get("full_report")
+            if preview:
+                readable_preview = _markdown_to_readable(str(preview))
+                events.append({
+                    "type": "timeline",
+                    "title": "策略洞见",
+                    "content": readable_preview,
+                })
+            recommendation = strategy_summary.get("recommendation")
+            target_price = strategy_summary.get("target_price")
+            confidence = strategy_summary.get("confidence")
+            if recommendation or target_price or confidence:
+                summary_parts = [
+                    f"建议：{recommendation}" if recommendation else "",
+                    f"目标价：{target_price}" if target_price else "",
+                    f"置信度：{confidence}" if confidence else "",
+                ]
+                summary = "｜".join([part for part in summary_parts if part])
+                if summary:
+                    title = "策略完成"
+                    try:
+                        template_type = response.metadata.get("template_type") if isinstance(response.metadata, dict) else None
+                        cta_label = response.metadata.get("cta_label") if isinstance(response.metadata, dict) else None
+                        if cta_label:
+                            title = f"{cta_label}完成"
+                        elif template_type == "valuation":
+                            title = "估值策略完成"
+                        elif template_type == "industry":
+                            title = "行业策略完成"
+                        elif template_type == "risk":
+                            title = "风险评估完成"
+                    except Exception:
+                        title = "策略完成"
+                    events.append({
+                        "type": "timeline",
+                        "title": title,
+                        "content": summary,
+                    })
+
+        return events
+
+    learning_meta = metadata.get("learning_workshop") if isinstance(metadata, dict) else None
+    if isinstance(learning_meta, dict):
+        knowledge_point = learning_meta.get("knowledge_point")
+        if knowledge_point:
+            events.append({"type": "timeline", "title": "知识点", "content": str(knowledge_point)})
+
+    plan = response.plan if isinstance(response.plan, dict) else {}
+    if plan:
+        plan_summary = plan.get("intent") or plan.get("summary")
+        if plan_summary:
+            events.append({"type": "timeline", "title": "规划完成", "content": str(plan_summary)})
+
+    sections = _extract_report_sections(response.report or "")
+    section_mapping = (
+        ("学习目标", "学习目标"),
+        ("微型任务步骤", "任务步骤"),
+        ("验证逻辑", "验证逻辑"),
+        ("AI 指导", "AI 指导"),
+    )
+
+    for key, title in section_mapping:
+        content = sections.get(key)
+        if content:
+            events.append({"type": "timeline", "title": title, "content": content})
+
+    return events
+
+
 def build_application() -> FastAPI:
     app = FastAPI(title="HolisticaQuant API", version="0.1.0")
 
@@ -102,46 +372,82 @@ def build_application() -> FastAPI:
         if graph is None:  # pragma: no cover - 理论不会出现
             raise HTTPException(status_code=503, detail="Graph not initialized")
 
-        context = payload.context.copy() if payload.context else {}
-        context.setdefault("trigger_time", datetime.now().strftime("%Y-%m-%d %H:00:00"))
-
         try:
-            state = await graph.run_async(query=payload.query, context=context)
-        except Exception as exc:  # pragma: no cover - 运行期异常
+            return await _execute_query(graph, payload)
+        except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-        # 可选场景覆盖（多用于调试或灰度控制）
-        if payload.scenario_override:
-            state["scenario_type"] = payload.scenario_override
+    @app.websocket("/api/query/stream")
+    async def stream_query(websocket: WebSocket) -> None:
+        await websocket.accept()
+        graph: HolisticaGraph = getattr(app.state, "graph", None)
+        if graph is None:
+            await websocket.send_json({"type": "error", "message": "Graph not initialized"})
+            await websocket.close()
+            return
 
-        metadata = jsonable_encoder(state.get("metadata", {}) or {})
-        scenario_type = state.get("scenario_type", "assistant")
-        plan = jsonable_encoder(state.get("plan") or {}) or None
-        tickers = jsonable_encoder(state.get("tickers", []) or [])
-        plan_target_id = state.get("plan_target_id")
-        report = state.get("report") or ""
+        try:
+            raw_message = await websocket.receive_text()
+        except WebSocketDisconnect:
+            return
+        except Exception as exc:  # pragma: no cover - 输入异常
+            await websocket.send_json({"type": "error", "message": f"无法读取请求：{exc}"})
+            await websocket.close()
+            return
 
-        segments: Dict[str, Any] = {
-            "learning_workshop": metadata.get("learning_workshop"),
-            "assistant_answer": metadata.get("assistant_answer"),
-            "data_analysis": state.get("data_analysis"),
-            "strategy": state.get("strategy"),
-            "data_sufficiency": state.get("data_sufficiency"),
-        }
+        try:
+            payload = QueryRequest.model_validate_json(raw_message)
+        except ValidationError as exc:
+            await websocket.send_json({"type": "error", "message": f"请求参数无效: {exc.errors()}"})
+            await websocket.close()
+            return
 
-        segments = {k: jsonable_encoder(v) for k, v in segments.items() if v}
-        trace = jsonable_encoder(state.get("trace")) if payload.return_trace else None
+        progress_queue: asyncio.Queue | None = asyncio.Queue()
+        progress_titles_streamed: Dict[str, int] = {}
 
-        return QueryResponse(
-            scenario_type=scenario_type,
-            plan=plan,
-            tickers=tickers,
-            plan_target_id=plan_target_id,
-            report=report,
-            metadata=metadata,
-            segments=segments,
-            trace=trace,
-        )
+        async def forward_progress() -> None:
+            if progress_queue is None:
+                return
+            while True:
+                item = await progress_queue.get()
+                if item is None:
+                    break
+                title = str(item.get("title", ""))
+                progress_titles_streamed[title] = progress_titles_streamed.get(title, 0) + 1
+                await websocket.send_json(item)
+
+        forward_task = asyncio.create_task(forward_progress())
+
+        try:
+            context_with_queue = payload.context.copy() if payload.context else {}
+            if progress_queue is not None:
+                context_with_queue["_progress_queue"] = progress_queue
+            payload = payload.model_copy(update={"context": context_with_queue})
+
+            await websocket.send_json({"type": "status", "message": "已接收任务，正在调度 AI 工作流……"})
+            response = await _execute_query(graph, payload)
+        except WebSocketDisconnect:
+            return
+        except Exception as exc:  # pragma: no cover - 执行异常
+            await websocket.send_json({"type": "error", "message": str(exc)})
+            await websocket.close()
+            return
+        finally:
+            if progress_queue is not None:
+                progress_queue.put_nowait(None)
+            await forward_task
+
+        try:
+            for event in _build_learning_timeline_events(response):
+                title = str(event.get("title", ""))
+                if title in {"数据收集", "数据分析"} and progress_titles_streamed.get(title):
+                    continue
+                await websocket.send_json(event)
+            await websocket.send_json({"type": "final", "payload": jsonable_encoder(response)})
+        except WebSocketDisconnect:
+            return
+        finally:
+            await websocket.close()
 
     return app
 

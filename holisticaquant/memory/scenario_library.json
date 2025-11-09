@@ -61,49 +61,207 @@
   "research_lab": {
     "templates": [
       {
-        "id": "tesla_equity_valuation_2025",
-        "title": "公司估值报告 · 特斯拉 2025",
-        "description": "针对特斯拉 2025 年的估值分析模板，聚焦盈利能力、行业对比与增长假设，适合课程作业或实战演练。",
+        "id": "valuation_catl_2025",
+        "title": "公司估值报告 · 宁德时代 2025",
+        "template_type": "valuation",
+        "ticker": "300750.SZ",
+        "description": "新能源电池龙头，聚焦盈利修复与估值区间，适合课堂演练或投研复盘。",
+        "hero_metrics": [
+          {
+            "label": "股价",
+            "value": "¥180",
+            "source": "Wind 2025-05-01"
+          },
+          {
+            "label": "EPS(2024E)",
+            "value": "6.8 元",
+            "source": "券商一致预期 2025-05"
+          }
+        ],
         "required_inputs": [
           {
-            "field": "current_price",
-            "label": "当前股价",
-            "unit": "美元",
-            "source_hint": "实时行情 / data_analyst 工具"
+            "field": "spot_price",
+            "label": "当前股价（人民币）",
+            "type": "number",
+            "unit": "元",
+            "default": 180,
+            "placeholder": "180.0"
           },
           {
             "field": "eps",
             "label": "每股收益（EPS）",
-            "unit": "美元",
-            "source_hint": "财报 / data_analyst 工具"
+            "type": "number",
+            "unit": "元",
+            "default": 6.8,
+            "placeholder": "6.8"
           },
           {
             "field": "industry_pe",
             "label": "行业平均 PE",
-            "unit": "",
-            "source_hint": "行业研究报告 / data_analyst 工具"
+            "type": "number",
+            "default": 24,
+            "placeholder": "24"
           }
         ],
-        "auto_metrics": [
+        "optional_inputs": [
           {
-            "name": "pe",
-            "formula": "当前股价 / 每股收益",
-            "description": "衡量估值水平的基础指标"
+            "field": "growth_rate",
+            "label": "利润增速假设（%）",
+            "type": "number",
+            "default": 25,
+            "placeholder": "25"
           },
           {
-            "name": "peg",
-            "formula": "PE / 净利润增速",
-            "description": "考察估值与增长匹配度，可在后续步骤补充"
+            "field": "target_price",
+            "label": "目标价（人民币）",
+            "type": "number",
+            "unit": "元",
+            "placeholder": "200"
           }
         ],
-        "report_outline": [
-          "摘要：概述估值结论与风险提示",
-          "公司基本面：盈利结构、增长驱动因素",
-          "估值对比：与行业平均的差异与原因",
-          "风险分析：销量假设、成本控制、政策风险",
-          "投资建议：Buy/Hold/Sell 与关键监控指标"
+        "analysis_focus": [
+          "估值对比：当前 PE vs 行业 18-24 区间",
+          "利润驱动：动力电池装机量、储能出货放量",
+          "关键假设：海外扩产节奏、原材料成本趋势"
         ],
-        "default_conclusion": "在当前假设下，特斯拉 PE≈20，高于行业均值 15。若增长预期维持 25%，建议保持 Hold，并结合 PEG≈0.8 评估合理性。"
+        "verification_sources": [
+          "宁德时代 2025Q1 财报：营收同比 +23%",
+          "工信部动力电池装机数据：2025Q1 +32%",
+          "上交所互动易：储能业务在手订单披露"
+        ],
+        "prompt_lead": "请基于宁德时代 2025 年公开数据与上述假设，生成结构化估值报告（摘要、估值对比、驱动因子、风险提示、投资建议）。",
+        "cta_label": "估值草稿"
+      },
+      {
+        "id": "industry_ai_server_supply_2025",
+        "title": "行业分析报告 · 国产 AI 服务器供给链",
+        "template_type": "industry",
+        "ticker": "688981.SH",
+        "description": "聚焦国产算力产业链，从芯片、服务器到集成商的协同增量。",
+        "hero_metrics": [
+          {
+            "label": "算力订单覆盖",
+            "value": "9 个月",
+            "source": "信创硬件联盟 2025Q1"
+          },
+          {
+            "label": "国产 GPU 占比",
+            "value": "45%",
+            "source": "工信部算力发展白皮书 2025"
+          }
+        ],
+        "required_inputs": [
+          {
+            "field": "market_size",
+            "label": "国内 AI 服务器市场规模（亿元）",
+            "type": "number",
+            "default": 950,
+            "placeholder": "950"
+          },
+          {
+            "field": "growth_rate",
+            "label": "预计年增速（%）",
+            "type": "number",
+            "default": 40,
+            "placeholder": "40"
+          },
+          {
+            "field": "key_players",
+            "label": "核心企业（逗号分隔）",
+            "type": "text",
+            "default": "浪潮信息, 中科曙光, 海光信息",
+            "placeholder": "浪潮信息, 中科曙光..."
+          }
+        ],
+        "optional_inputs": [
+          {
+            "field": "policy_support",
+            "label": "政策驱动要点",
+            "type": "text",
+            "placeholder": "数据中心能耗指标、算力券等"
+          }
+        ],
+        "analysis_focus": [
+          "供给链分层：芯片（688981.SH）、服务器整机、集成服务",
+          "需求引擎：金融、运营商、政务上云的渗透节奏",
+          "竞争格局：国产替代率、与海外厂商的性能价比"
+        ],
+        "verification_sources": [
+          "IDC《中国人工智能市场半年度报告 2025H1》",
+          "海光信息招股书更新稿",
+          "工信部信息通信发展司：东数西算节点建设进展"
+        ],
+        "prompt_lead": "请输出结构化行业分析报告（市场概览、供给链拆解、需求场景、竞争格局、政策影响、关键指标与下一步建议）。",
+        "cta_label": "行业快照"
+      },
+      {
+        "id": "risk_battery_supply_chain_2025",
+        "title": "风险评估报告 · 动力电池供应链",
+        "template_type": "risk",
+        "ticker": "603659.SH",
+        "description": "针对动力电池供应链的风险映射，覆盖原材料、产能、订单与政策波动。",
+        "hero_metrics": [
+          {
+            "label": "碳酸锂价格",
+            "value": "¥98,000/吨",
+            "source": "上海钢联 2025-05-08"
+          },
+          {
+            "label": "海外订单占比",
+            "value": "35%",
+            "source": "宁德时代 2025Q1 财报"
+          }
+        ],
+        "required_inputs": [
+          {
+            "field": "target_company",
+            "label": "评估主体",
+            "type": "text",
+            "default": "603659.SH - 璞泰来",
+            "placeholder": "603659.SH - 璞泰来"
+          },
+          {
+            "field": "capacity_utilization",
+            "label": "产能利用率（%）",
+            "type": "number",
+            "default": 78,
+            "placeholder": "78"
+          },
+          {
+            "field": "material_dependency",
+            "label": "关键原材料依赖度（%）",
+            "type": "number",
+            "default": 62,
+            "placeholder": "62"
+          }
+        ],
+        "optional_inputs": [
+          {
+            "field": "order_visibility",
+            "label": "订单可见期（月）",
+            "type": "number",
+            "default": 8,
+            "placeholder": "8"
+          },
+          {
+            "field": "policy_watch",
+            "label": "政策跟踪要点",
+            "type": "text",
+            "placeholder": "出口退税、海外关税、补贴退坡等"
+          }
+        ],
+        "analysis_focus": [
+          "供应链风险：原材料价格、上游集中度、产能爬坡速度",
+          "订单风险：客户结构、海外订单可见度、定价条款",
+          "政策风险：国内外补贴、环保审查、贸易壁垒"
+        ],
+        "verification_sources": [
+          "SMM 碳酸锂现货价 2025Q2",
+          "宁德时代 / 比亚迪 2025Q1 财报披露",
+          "商务部关税与贸易政策通告"
+        ],
+        "prompt_lead": "请输出结构化风险评估报告（风险地图、影响测算、预警指标、缓释建议），并结合输入的假设给出结论。",
+        "cta_label": "风险雷达"
       }
     ]
   }
