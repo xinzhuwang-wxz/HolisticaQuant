@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Send, TrendingUp, BarChart3, Lightbulb, Bot, User, ExternalLink, RefreshCw } from 'lucide-react'
+import { runQuery } from '../lib/apiClient'
+import type { QueryResponse } from '../types'
 
 interface Message {
   id: string
@@ -55,7 +57,7 @@ const QAEngine: React.FC = () => {
     scrollToBottom()
   }, [messages])
 
-  const generateAIResponse = (question: string): { content: string, data?: any[] } => {
+  const getMockAssistantResponse = (question: string): { content: string, data?: any[] } => {
     // Simulate different responses based on question content
     if (question.includes("PE=20") || question.includes("PE=20 high")) {
       return {
@@ -140,13 +142,49 @@ It is recommended to combine multiple valuation methods and consider industry ch
     }
   }
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return
+  const fetchAssistantAnswer = async (question: string): Promise<{ content: string; data?: any[] }> => {
+    try {
+      const response: QueryResponse = await runQuery({
+        query: question,
+        scenarioOverride: 'assistant',
+      })
+      const assistantData = response.metadata?.assistant_answer as Record<string, any> | undefined
+      const answer = assistantData?.answer ?? (response.report || '').trim()
+      const supportingPoints = Array.isArray(assistantData?.supporting_points) ? assistantData.supporting_points : []
+      const dataSources = Array.isArray(assistantData?.data_sources) ? assistantData.data_sources : []
+      const recommended = Array.isArray(assistantData?.recommended_next_actions) ? assistantData?.recommended_next_actions : []
+      const scenarioContext = assistantData?.scenario_context
+
+      let enhancedAnswer = answer || '尚未获取到有效回答。'
+      if (scenarioContext) {
+        enhancedAnswer = `场景：${scenarioContext}\n\n${enhancedAnswer}`
+      }
+      if (recommended.length > 0) {
+        enhancedAnswer += `\n\n推荐下一步：\n${recommended.map((item: string) => `- ${item}`).join('\n')}`
+      }
+
+      const evidence = dataSources.length > 0 ? dataSources : supportingPoints
+      const structuredData = evidence.map((entry: string, idx: number) => ({
+        source: dataSources.length > 0 ? entry : `Point ${idx + 1}`,
+        value: supportingPoints[idx] ?? entry,
+        timestamp: '',
+      }))
+
+      return { content: enhancedAnswer, data: structuredData }
+    } catch (error) {
+      console.error('QAEngine API error:', error)
+      return getMockAssistantResponse(question)
+    }
+  }
+
+  const handleSendMessage = async (overrideMessage?: string) => {
+    const question = overrideMessage ?? inputMessage
+    if (!question.trim()) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
+      content: question,
       timestamp: new Date()
     }
 
@@ -154,29 +192,23 @@ It is recommended to combine multiple valuation methods and consider industry ch
     setInputMessage('')
     setIsTyping(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(inputMessage)
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: aiResponse.content,
-        data: aiResponse.data,
-        timestamp: new Date()
-      }
-      
-      setMessages(prev => [...prev, aiMessage])
-      setIsTyping(false)
-    }, 1500)
-  }
+    const aiResponse = await fetchAssistantAnswer(question)
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: aiResponse.content,
+      data: aiResponse.data,
+      timestamp: new Date()
+    }
 
-  const handleSampleQuestion = (question: string) => {
-    setInputMessage(question)
-    setTimeout(() => {
-      handleSendMessage()
-    }, 100)
+    setMessages(prev => [...prev, aiMessage])
+    setIsTyping(false)
   }
-
+ 
+   const handleSampleQuestion = (question: string) => {
+    handleSendMessage(question)
+  }
+ 
   const handleRegenerate = (messageId: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId)
     if (messageIndex === -1) return
@@ -185,9 +217,8 @@ It is recommended to combine multiple valuation methods and consider industry ch
     if (!userMessage || userMessage.type !== 'user') return
 
     setIsTyping(true)
-    
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(userMessage.content)
+
+    fetchAssistantAnswer(userMessage.content).then((aiResponse) => {
       const newMessage: Message = {
         id: (Date.now() + 2).toString(),
         type: 'assistant',
@@ -195,12 +226,11 @@ It is recommended to combine multiple valuation methods and consider industry ch
         data: aiResponse.data,
         timestamp: new Date()
       }
-      
+
       setMessages(prev => prev.map((msg, index) => 
         index === messageIndex ? newMessage : msg
       ))
-      setIsTyping(false)
-    }, 1500)
+    }).finally(() => setIsTyping(false))
   }
 
   return (

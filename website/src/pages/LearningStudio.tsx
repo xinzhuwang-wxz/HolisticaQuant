@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Calculator, TrendingUp, CheckCircle, BookOpen, Target, Lightbulb } from 'lucide-react'
+import { runQuery } from '../lib/apiClient'
+import type { QueryResponse } from '../types'
 
 interface Task {
   id: string
@@ -14,96 +16,114 @@ interface Task {
   learningObjectives: string[]
 }
 
+const TASKS: Task[] = [
+  {
+    id: 'cbdc-analysis',
+    title: 'CBDC Impact Analysis',
+    description: 'Calculate the growth rate of bank digitalization revenue after CBDC pilot implementation',
+    difficulty: 'intermediate',
+    estimatedTime: '15 min',
+    scenario: '2025 China CBDC Pilot Program',
+    dataPoints: ['Cities: 15 major cities', 'User Scale: 50M users', 'Transaction Volume: 2.3B transactions'],
+    learningObjectives: [
+      'Understand the impact of CBDC on traditional banking',
+      'Master revenue growth rate calculation methods',
+      'Learn to analyze the efficiency improvement of digital payments'
+    ]
+  },
+  {
+    id: 'tesla-valuation',
+    title: 'Tesla Valuation Model',
+    description: 'Build a DCF model to evaluate Tesla\'s reasonable valuation range',
+    difficulty: 'advanced',
+    estimatedTime: '30 min',
+    scenario: '2025 Tesla Stock Analysis',
+    dataPoints: ['Current Price: $200', 'EPS: $10', 'Expected Growth: 25%'],
+    learningObjectives: [
+      'Master DCF valuation model principles',
+      'Learn to set reasonable growth assumptions',
+      'Understand the relationship between growth and valuation'
+    ]
+  },
+  {
+    id: 'portfolio-optimization',
+    title: 'Portfolio Optimization',
+    description: 'Use Markowitz theory to optimize investment portfolio allocation',
+    difficulty: 'beginner',
+    estimatedTime: '20 min',
+    scenario: 'Multi-asset Portfolio Construction',
+    dataPoints: ['Assets: 5 major categories', 'Historical Data: 3 years', 'Risk Level: Medium'],
+    learningObjectives: [
+      'Understand the basic principles of modern portfolio theory',
+      'Learn to calculate the efficient frontier',
+      'Master risk-return trade-off analysis'
+    ]
+  }
+]
+
+const getMockResult = (taskId: string) => {
+  if (taskId === 'cbdc-analysis') {
+    const revenueBefore = 1000
+    const revenueAfter = 1200
+    const growthRate = ((revenueAfter - revenueBefore) / revenueBefore * 100).toFixed(1)
+    return `Analysis Results:\n\nRevenue Growth Rate: +${growthRate}%\nBefore Revenue: $${revenueBefore}B\nAfter Revenue: $${revenueAfter}B\n\nConclusion: CBDC implementation significantly improves payment efficiency, driving digital revenue growth for banks.`
+  }
+  if (taskId === 'tesla-valuation') {
+    const pe = 20
+    const growth = 25
+    const peg = (pe / growth).toFixed(2)
+    const fairValue = parseFloat(peg) < 1 ? 'Undervalued' : parseFloat(peg) > 1.5 ? 'Overvalued' : 'Fair Value'
+    return `Valuation Analysis:\n\nCurrent PE: ${pe}\nGrowth Rate: ${growth}%\nPEG Ratio: ${peg}\n\nValuation Status: ${fairValue}\nInvestment Recommendation: ${parseFloat(peg) < 1 ? 'Buy' : parseFloat(peg) > 1.5 ? 'Hold' : 'Hold'}`
+  }
+  if (taskId === 'portfolio-optimization') {
+    const expectedReturn = 12.5
+    const risk = 8.2
+    const sharpeRatio = (expectedReturn / risk).toFixed(2)
+    return `Portfolio Optimization Results:\n\nExpected Return: ${expectedReturn}%\nPortfolio Risk: ${risk}%\nSharpe Ratio: ${sharpeRatio}\n\nOptimization Effect: Risk-adjusted return improved by 15% compared to equal-weight allocation.`
+  }
+  return 'Mock data unavailable for the selected task.'
+}
+
 const LearningStudio: React.FC = () => {
   const navigate = useNavigate()
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [activeTaskId, setActiveTaskId] = useState<string>(TASKS[0].id)
   const [taskInput, setTaskInput] = useState('')
   const [taskResult, setTaskResult] = useState<string | null>(null)
   const [isCalculating, setIsCalculating] = useState(false)
+  const [apiMetadata, setApiMetadata] = useState<Record<string, any> | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const tasks: Task[] = [
-    {
-      id: 'cbdc-analysis',
-      title: 'CBDC Impact Analysis',
-      description: 'Calculate the growth rate of bank digitalization revenue after CBDC pilot implementation',
-      difficulty: 'intermediate',
-      estimatedTime: '15 min',
-      scenario: '2025 China CBDC Pilot Program',
-      dataPoints: ['Cities: 15 major cities', 'User Scale: 50M users', 'Transaction Volume: 2.3B transactions'],
-      learningObjectives: [
-        'Understand the impact of CBDC on traditional banking',
-        'Master revenue growth rate calculation methods',
-        'Learn to analyze the efficiency improvement of digital payments'
-      ]
-    },
-    {
-      id: 'tesla-valuation',
-      title: 'Tesla Valuation Model',
-      description: 'Build a DCF model to evaluate Tesla\'s reasonable valuation range',
-      difficulty: 'advanced',
-      estimatedTime: '30 min',
-      scenario: '2025 Tesla Stock Analysis',
-      dataPoints: ['Current Price: $200', 'EPS: $10', 'Expected Growth: 25%'],
-      learningObjectives: [
-        'Master DCF valuation model principles',
-        'Learn to set reasonable growth assumptions',
-        'Understand the relationship between growth and valuation'
-      ]
-    },
-    {
-      id: 'portfolio-optimization',
-      title: 'Portfolio Optimization',
-      description: 'Use Markowitz theory to optimize investment portfolio allocation',
-      difficulty: 'beginner',
-      estimatedTime: '20 min',
-      scenario: 'Multi-asset Portfolio Construction',
-      dataPoints: ['Assets: 5 major categories', 'Historical Data: 3 years', 'Risk Level: Medium'],
-      learningObjectives: [
-        'Understand the basic principles of modern portfolio theory',
-        'Learn to calculate the efficient frontier',
-        'Master risk-return trade-off analysis'
-      ]
-    }
-  ]
+  const selectedTask = useMemo(() => TASKS.find(task => task.id === activeTaskId) ?? TASKS[0], [activeTaskId])
 
-  const handleStartTask = (task: Task) => {
-    setSelectedTask(task)
-    setTaskInput('')
-    setTaskResult(null)
-  }
-
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     if (!taskInput.trim()) return
-    
     setIsCalculating(true)
-    
-    setTimeout(() => {
-      let result = ''
-      
-      if (selectedTask?.id === 'cbdc-analysis') {
-        const revenueBefore = 1000 // 10 billion
-        const revenueAfter = 1200 // 12 billion
-        const growthRate = ((revenueAfter - revenueBefore) / revenueBefore * 100).toFixed(1)
-        
-        result = `Analysis Results:\n\nRevenue Growth Rate: +${growthRate}%\nBefore Revenue: $${revenueBefore}B\nAfter Revenue: $${revenueAfter}B\n\nConclusion: CBDC implementation significantly improves payment efficiency, driving digital revenue growth for banks.`
-      } else if (selectedTask?.id === 'tesla-valuation') {
-        const pe = 20
-        const growth = 25
-        const peg = (pe / growth).toFixed(2)
-        const fairValue = parseFloat(peg) < 1 ? 'Undervalued' : parseFloat(peg) > 1.5 ? 'Overvalued' : 'Fair Value'
-        
-        result = `Valuation Analysis:\n\nCurrent PE: ${pe}\nGrowth Rate: ${growth}%\nPEG Ratio: ${peg}\n\nValuation Status: ${fairValue}\nInvestment Recommendation: ${parseFloat(peg) < 1 ? 'Buy' : parseFloat(peg) > 1.5 ? 'Hold' : 'Hold'}`
-      } else if (selectedTask?.id === 'portfolio-optimization') {
-        const expectedReturn = 12.5
-        const risk = 8.2
-        const sharpeRatio = (expectedReturn / risk).toFixed(2)
-        
-        result = `Portfolio Optimization Results:\n\nExpected Return: ${expectedReturn}%\nPortfolio Risk: ${risk}%\nSharpe Ratio: ${sharpeRatio}\n\nOptimization Effect: Risk-adjusted return improved by 15% compared to equal-weight allocation.`
-      }
-      
-      setTaskResult(result)
+    setTaskResult(null)
+    setApiMetadata(null)
+    setErrorMessage(null)
+
+    const prompt = [
+      `场景化学习任务: ${selectedTask.title}`,
+      `任务描述: ${selectedTask.description}`,
+      `核心数据点: ${selectedTask.dataPoints.join('；')}`,
+      `学习者反馈: ${taskInput}`,
+      '请按照 LearningWorkshopSchema 的结构生成指导，并包含可执行步骤与验证逻辑。',
+    ].join('\n')
+
+    try {
+      const response: QueryResponse = await runQuery({
+        query: prompt,
+        scenarioOverride: 'learning_workshop',
+      })
+      setTaskResult(response.report.trim())
+      setApiMetadata(response.metadata ?? null)
+    } catch (error) {
+      console.error('LearningStudio API error:', error)
+      setErrorMessage(error instanceof Error ? error.message : '请求失败')
+      setTaskResult(getMockResult(selectedTask.id))
+    } finally {
       setIsCalculating(false)
-    }, 2000)
+    }
   }
 
   return (
@@ -126,97 +146,64 @@ const LearningStudio: React.FC = () => {
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
         <AnimatePresence mode="wait">
-          {!selectedTask && (
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -30 }}
-              className="max-w-4xl mx-auto text-center"
-            >
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-gray-800 mb-3 sm:mb-4"
-              >
-                Scenario-Based Learning Studio
-              </motion.h1>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="max-w-5xl mx-auto w-full"
+          >
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">Scenario-Based Learning Studio</h2>
+              <p className="text-gray-600">Transform abstract knowledge into actionable tasks through real-world scenarios</p>
+            </div>
 
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="text-lg sm:text-xl text-gray-600 mb-8 sm:mb-12"
-              >
-                Transform abstract knowledge into actionable tasks through real-world scenarios
-              </motion.p>
-
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="text-lg text-primary-600 mb-16 font-medium"
-              >
-                "Learn by Doing, Not by Memorizing."
-              </motion.p>
-
-              {/* Task Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
-                {tasks.map((task, index) => (
-                  <motion.div
-                    key={task.id}
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8 + index * 0.2 }}
-                    className="group cursor-pointer"
-                    onClick={() => handleStartTask(task)}
-                  >
-                    <div className="glass-effect p-4 sm:p-6 rounded-3xl hover:scale-102 transition-all duration-500 h-full">
-                      <div className="flex items-center justify-between mb-3 sm:mb-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          task.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
-                          task.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}
-                        </span>
-                        <span className="text-sm text-gray-500">{task.estimatedTime}</span>
-                      </div>
-                      
-                      <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-4">{task.title}</h3>
-                      <p className="text-gray-600 mb-4 sm:mb-6 text-sm">{task.description}</p>
-                      
-                      <div className="space-y-2 mb-4 sm:mb-6">
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <Target className="w-3 h-3" />
-                          <span>{task.scenario}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="text-primary-500 font-semibold group-hover:text-primary-600 transition-colors">
-                        Start Task →
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {selectedTask && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="max-w-4xl mx-auto w-full"
-            >
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-800 mb-4">{selectedTask.title}</h2>
-                <p className="text-gray-600">{selectedTask.scenario}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-8 items-start">
+              <div className="space-y-4">
+                <div className="glass-effect p-4 rounded-3xl">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-primary-500" />
+                    Scenario Tasks
+                  </h3>
+                  <div className="space-y-3">
+                    {TASKS.map((task) => {
+                      const isActive = task.id === activeTaskId
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => {
+                            setActiveTaskId(task.id)
+                            setTaskInput('')
+                            setTaskResult(null)
+                            setApiMetadata(null)
+                            setErrorMessage(null)
+                          }}
+                          className={`w-full text-left p-4 rounded-2xl transition-all ${
+                            isActive
+                              ? 'bg-primary-500 text-white shadow-[0_18px_40px_rgba(42,199,165,0.25)]'
+                              : 'bg-white/70 text-gray-700 hover:bg-white shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] mb-2">
+                            <span>{task.difficulty.toUpperCase()}</span>
+                            <span>{task.estimatedTime}</span>
+                          </div>
+                          <div className="text-sm font-semibold">{task.title}</div>
+                          <div className={`mt-1 text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
+                            {task.scenario}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
 
-              <div className="glass-effect-strong p-8 rounded-3xl mb-8">
-                {/* Task Overview */}
+              <div className="glass-effect-strong p-8 rounded-3xl">
+                <div className="text-center mb-10">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-3">{selectedTask.title}</h2>
+                  <p className="text-gray-600">{selectedTask.scenario}</p>
+                </div>
+
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                     <BookOpen className="w-5 h-5" />
@@ -226,14 +213,13 @@ const LearningStudio: React.FC = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     {selectedTask.dataPoints.map((point, index) => (
-                      <div key={index} className="bg-white/60 p-4 rounded-xl">
+                      <div key={index} className="bg-white/70 p-4 rounded-xl">
                         <p className="text-sm text-gray-600">{point}</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Learning Objectives */}
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                     <Lightbulb className="w-5 h-5" />
@@ -249,14 +235,13 @@ const LearningStudio: React.FC = () => {
                   </ul>
                 </div>
 
-                {/* Task Input */}
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                     <Calculator className="w-5 h-5" />
                     Complete the Task
                   </h3>
                   
-                  <div className="bg-white/60 p-6 rounded-2xl mb-4">
+                  <div className="bg-white/70 p-6 rounded-2xl mb-4">
                     {selectedTask.id === 'cbdc-analysis' && (
                       <div>
                         <p className="text-gray-700 mb-4">
@@ -346,7 +331,41 @@ const LearningStudio: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Task Result */}
+                {errorMessage && (
+                  <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+                    {errorMessage} · 已回退到示例数据。
+                  </div>
+                )}
+
+                {apiMetadata?.learning_workshop && (
+                  <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6">
+                    <h4 className="text-lg font-semibold text-emerald-700 mb-3">AI 指导摘要</h4>
+                    <p className="text-sm text-emerald-900 mb-4">
+                      知识点：{apiMetadata.learning_workshop.knowledge_point}
+                    </p>
+                    {Array.isArray(apiMetadata.learning_workshop.learning_objectives) && (
+                      <div className="mb-4">
+                        <div className="text-sm font-semibold text-emerald-700">学习目标</div>
+                        <ul className="mt-2 space-y-1 text-sm text-emerald-900">
+                          {apiMetadata.learning_workshop.learning_objectives.map((obj: string, idx: number) => (
+                            <li key={idx}>• {obj}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {Array.isArray(apiMetadata.learning_workshop.task_steps) && (
+                      <div>
+                        <div className="text-sm font-semibold text-emerald-700">任务步骤</div>
+                        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-emerald-900">
+                          {apiMetadata.learning_workshop.task_steps.map((step: string, idx: number) => (
+                            <li key={idx}>{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <AnimatePresence>
                   {taskResult && (
                     <motion.div
@@ -365,29 +384,21 @@ const LearningStudio: React.FC = () => {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
 
-              {/* Navigation */}
-              <div className="flex justify-center gap-4">
-                <button
-                  onClick={() => setSelectedTask(null)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  Back to Tasks
-                </button>
-                
                 {taskResult && (
-                  <button
-                    onClick={() => navigate('/research')}
-                    className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-semibold rounded-xl transition-colors flex items-center gap-2"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    Start Research
-                  </button>
+                  <div className="mt-8 flex justify-center">
+                    <button
+                      onClick={() => navigate('/research')}
+                      className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-semibold rounded-xl transition-colors flex items-center gap-2"
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                      Continue with Research Flow
+                    </button>
+                  </div>
                 )}
               </div>
-            </motion.div>
-          )}
+            </div>
+          </motion.div>
         </AnimatePresence>
       </div>
     </div>

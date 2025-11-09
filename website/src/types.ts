@@ -41,3 +41,14 @@ export interface Source {
   url: string
   type: 'financial' | 'news' | 'report' | 'database'
 }
+
+export interface QueryResponse {
+  scenario_type: 'learning_workshop' | 'research_lab' | 'assistant'
+  plan?: Record<string, unknown> | null
+  tickers: string[]
+  plan_target_id?: string | null
+  report: string
+  metadata: Record<string, unknown>
+  segments: Record<string, unknown>
+  trace?: Record<string, unknown>[] | null
+}

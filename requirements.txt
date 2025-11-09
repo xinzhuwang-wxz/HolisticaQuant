@@ -15,6 +15,10 @@ langchain-openai>=0.0.5
 langchain-anthropic>=0.1.0
 langgraph>=0.0.30
 
+# API框架
+fastapi>=0.115.0
+uvicorn[standard]>=0.24.0
+
 # 数据源依赖
 # akshare - 用于获取市场数据和资金流数据
 akshare>=1.12.0

@@ -73,6 +73,16 @@ npm run dev
 
 依赖安装完成后即可正常加载 `vite` 与 `postcss`。如在 Cursor 沙箱内运行仍无法访问本地端口，这是沙箱限制所致，可在本地终端直接执行 `npm run dev` 查看页面。
 
+### 5. 一键启动前后端
+
+```bash
+python scripts/dev.py
+```
+
+- 首次运行（或清空依赖后）请先执行 `npm install --include=dev`（`cd website`）。
+- 脚本会自动加载 `.env`、启动 FastAPI（默认端口 8000）并拉起 Vite 前端（默认端口 5173）。
+- 如需自定义跨域策略，可在 `holisticaquant/api/server.py` 调整 `CORSMiddleware`。
+
 ## 配置说明
 
 ### LLM提供商
