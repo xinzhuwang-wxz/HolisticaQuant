@@ -34,7 +34,7 @@ const LandingPage: React.FC = () => {
       accent: 'from-white/35 via-white/18 to-white/6 text-white/85 hover:text-white',
     },
     {
-      label: 'Start Experience',
+      label: 'Start',
       onClick: () => handleScrollTo('experience'),
       accent: 'from-primary-400/65 via-primary-500/55 to-primary-500/40 text-white hover:text-white',
     },
@@ -357,10 +357,12 @@ const LandingPage: React.FC = () => {
   return (
     <div className="h-screen w-screen overflow-y-scroll snap-y snap-mandatory bg-gradient-to-br from-slate-50 via-white to-cyan-50/30">
       {/* Hero Section – Cinematic Brand Entry */}
-      <section id="hero" className="relative h-screen snap-start overflow-hidden">
+      <section id="hero" className="relative h-screen snap-start overflow-hidden vignette">
         {/* Atmospheric background */}
         <div className="absolute inset-0 noise-bg" />
         <div className="absolute inset-0 bg-gradient-to-br from-[#0A1A2F] via-[#0F2744] to-cyan-600/20" />
+        {/* Tech grid texture */}
+        <div className="absolute inset-0 grid-pattern" />
         {/* Cinematic fog intro */}
         <motion.div
           className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#040910] via-[#09172A] to-[#123456]"
@@ -550,9 +552,10 @@ const LandingPage: React.FC = () => {
       </section>
 
         {/* Scene 1 – Learning Studio */}
-      <section id="scene-learning" className="relative h-screen snap-start overflow-hidden">
+      <section id="scene-learning" className="relative h-screen snap-start overflow-hidden vignette">
         <div className="absolute inset-0 bg-gradient-to-br from-[#e8f6f1] via-[#f1f4ff] to-[#dcecf8]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(920px 540px at 22% 74%, rgba(46,180,160,0.22) 0%, transparent 70%)' }} />
+        <div className="absolute inset-0 grid-pattern" />
 
         <motion.div
           variants={sectionVariants}
@@ -567,7 +570,7 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto w-full px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
-                <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900">
+                <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900 headline-orange">
                   事件驱动的学习实验室
                 </h2>
                 <p className="text-slate-600 leading-relaxed">
@@ -592,8 +595,8 @@ const LandingPage: React.FC = () => {
                     { title: 'STEP 01', desc: '锚定标的与模板' },
                     { title: 'STEP 02', desc: '推演关键变量' },
                     { title: 'STEP 03', desc: '生成验证快照' },
-                  ].map((item) => (
-                    <div key={item.title} className="rounded-xl bg-white shadow-[0_12px_35px_rgba(40,120,110,0.12)] border border-white/80 px-4 py-3">
+                    ].map((item) => (
+                    <div key={item.title} className="rounded-xl bg-white shadow-[0_12px_35px_rgba(40,120,110,0.12)] border border-white/80 px-4 py-3 accent-edge">
                       <div className="text-xs uppercase tracking-[0.35em] text-primary-500/80">{item.title}</div>
                       <div className="text-sm font-semibold text-slate-700 mt-2">{item.desc}</div>
                     </div>
@@ -609,9 +612,10 @@ const LandingPage: React.FC = () => {
       </section>
 
         {/* Scene 2 – Research Lab (Tension) */}
-      <section id="scene-research" className="relative h-screen snap-start overflow-hidden">
+      <section id="scene-research" className="relative h-screen snap-start overflow-hidden vignette">
         <div className="absolute inset-0 bg-gradient-to-br from-[#e6efff] via-[#eef4ff] to-[#d9edff]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(120deg, rgba(120,170,250,0.22), transparent 62%), radial-gradient(920px 520px at 72% 38%, rgba(140,185,255,0.25) 0%, transparent 70%)' }} />
+        <div className="absolute inset-0 grid-pattern" />
 
         <motion.div
           variants={sectionVariants}
@@ -626,7 +630,7 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto w-full px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6 text-slate-800">
-                <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900">
+                <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900 headline-orange">
                   模板驱动的投研流水线
                 </h2>
                 <p className="text-slate-600 leading-relaxed">
@@ -647,7 +651,7 @@ const LandingPage: React.FC = () => {
                   </li>
                 </ul>
                 <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="rounded-2xl bg-white/90 border border-white/70 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(30,70,140,0.18)]">
+                  <div className="rounded-2xl bg-white/90 border border-white/70 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(30,70,140,0.18)] accent-edge">
                     <div className="text-xs uppercase tracking-[0.35em] text-sky-600/80">Report Snapshot</div>
                     <div className="mt-3 text-sm leading-relaxed text-slate-700">
                       • 摘要：维持增持，目标价 205~215。<br />
@@ -655,7 +659,7 @@ const LandingPage: React.FC = () => {
                       • 风险：锂价波动、海外交付、汇率。
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white/85 border border-white/60 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(30,70,140,0.15)]">
+                  <div className="rounded-2xl bg-white/85 border border-white/60 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(30,70,140,0.15)] accent-edge">
                     <div className="text-xs uppercase tracking-[0.35em] text-sky-600/80">Model Timeline</div>
                     <ul className="mt-3 text-sm space-y-2 text-slate-700">
                       <li>① 读取模板参数</li>
@@ -674,9 +678,10 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Scene 3 – Q&A Engine (Release) */}
-      <section id="scene-qa" className="relative h-screen snap-start overflow-hidden">
+      <section id="scene-qa" className="relative h-screen snap-start overflow-hidden vignette">
         <div className="absolute inset-0 bg-gradient-to-br from-[#f1e9ff] via-[#f5ecff] to-[#ece2ff]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(140deg, rgba(190,160,255,0.24), transparent 70%), radial-gradient(860px 520px at 38% 44%, rgba(210,190,255,0.22) 0%, transparent 74%)' }} />
+        <div className="absolute inset-0 grid-pattern" />
 
         <motion.div
           variants={sectionVariants}
@@ -691,7 +696,7 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto w-full px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6 text-slate-800">
-                <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900">
+                <h2 className="text-5xl md:text-[3rem] font-display font-bold text-slate-900 headline-orange">
                   会讲故事的投研对话台
                 </h2>
                 <p className="text-slate-600 leading-relaxed">
@@ -712,7 +717,7 @@ const LandingPage: React.FC = () => {
                   </li>
                 </ul>
                 <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="rounded-2xl bg-white/92 border border-white/70 backdrop-blur-md p-4 shadow-[0_20px_55px_rgba(130,90,220,0.18)]">
+                  <div className="rounded-2xl bg-white/92 border border-white/70 backdrop-blur-md p-4 shadow-[0_20px_55px_rgba(130,90,220,0.18)] accent-edge">
                     <div className="text-[0.65rem] uppercase tracking-[0.35em] text-violet-600/80">Answer Snapshot</div>
                     <div className="mt-3 text-sm leading-relaxed text-slate-700">
                       • 结论：AI 服务器毛利压缩 1~1.5pct，可用服务化对冲。<br />
@@ -720,7 +725,7 @@ const LandingPage: React.FC = () => {
                       • 行动：盯 GPU 采购价、服务收入占比与海外交付节奏。
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white/88 border border-white/60 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(120,80,200,0.16)]">
+                  <div className="rounded-2xl bg-white/88 border border-white/60 backdrop-blur-md p-4 shadow-[0_18px_50px_rgba(120,80,200,0.16)] accent-edge">
                     <div className="text-[0.65rem] uppercase tracking-[0.35em] text-violet-600/80">Live Timeline</div>
                     <ul className="mt-3 text-sm space-y-2 text-slate-700">
                       <li>① 提问解析</li>
@@ -742,9 +747,10 @@ const LandingPage: React.FC = () => {
       {/* Scene 4 – 已移除（App Ecosystem） */}
 
       {/* Scene 5 – Interactive Hub (Resonance & Closure) */}
-      <section id="experience" className="relative h-screen snap-start overflow-hidden">
+      <section id="experience" className="relative h-screen snap-start overflow-hidden vignette">
         <div className="absolute inset-0 bg-gradient-to-br from-[#f4f6fb] via-[#edf4f2] to-[#f9f3ff]" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(980px 540px at 62% 42%, rgba(180,230,220,0.22) 0%, transparent 70%)' }} />
+        <div className="absolute inset-0 grid-pattern" />
 
         <motion.div
           variants={sectionVariants}
@@ -757,7 +763,8 @@ const LandingPage: React.FC = () => {
         >
           <div className="max-w-7xl mx-auto w-full px-6">
             <div className="text-center mb-10">
-              <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900">Interactive Hub</h2>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900 headline-orange">Interactive Hub</h2>
+              <div className="neon-divider" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -775,7 +782,7 @@ const LandingPage: React.FC = () => {
                 >
                   <div className="text-xl font-semibold text-slate-900 mb-2">{card.title}</div>
                   <div className="text-slate-600 mb-6">{card.desc}</div>
-                    <button onClick={() => navigate(card.href)} className="px-5 py-2 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors inline-flex items-center gap-2">
+                    <button onClick={() => navigate(card.href)} className="px-5 py-2 rounded-xl btn-neon inline-flex items-center gap-2">
                     Explore
                     <ArrowRight className="w-4 h-4" />
                   </button>

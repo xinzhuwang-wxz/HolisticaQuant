@@ -11,6 +11,15 @@
   color: rgba(10, 31, 28, 0.87);
   background-color: #ffffff;
 
+  /* Visual tokens for fintech aesthetic */
+  --brand-primary: 42, 199, 165; /* rgb */
+  --brand-cyan: 100, 255, 208;
+  --brand-deep: 10, 26, 47;
+  --grid-line: 8, 18, 32;
+  --glow-strong: rgba(42, 199, 165, 0.45);
+  --glow-soft: rgba(120, 248, 214, 0.28);
+  --surface-glass: rgba(255, 255, 255, 0.35);
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -70,4 +79,121 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: -1;
+}
+
+/* Aurora gradient mesh background (purely visual) */
+.aurora-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1200px 650px at 50% 45%, rgba(var(--brand-primary), 0.22) 0%, rgba(var(--brand-primary), 0.1) 40%, transparent 72%),
+              radial-gradient(closest-side, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 70%);
+  filter: blur(50px);
+  animation: gradientShift 10s ease-in-out infinite alternate;
+}
+
+/* Subtle vignette to add cinematic depth */
+.vignette::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 50%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.08) 80%, rgba(0,0,0,0.12) 100%);
+}
+
+/* Fine grid pattern for tech-finance texture */
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(0deg, rgba(var(--grid-line), 0.05), rgba(var(--grid-line), 0.02)),
+    repeating-linear-gradient(0deg, rgba(var(--grid-line), 0.08) 0px, rgba(var(--grid-line), 0.08) 1px, transparent 1px, transparent 28px),
+    repeating-linear-gradient(90deg, rgba(var(--grid-line), 0.08) 0px, rgba(var(--grid-line), 0.08) 1px, transparent 1px, transparent 28px);
+  opacity: 0.35;
+}
+
+/* Neon divider for section separation */
+.neon-divider {
+  position: relative;
+  height: 1px;
+  margin: 24px 0;
+  background: linear-gradient(90deg, rgba(var(--brand-primary), 0), rgba(var(--brand-primary), 0.55), rgba(var(--brand-primary), 0));
+  box-shadow: 0 0 24px var(--glow-soft);
+}
+
+/* Shimmering headline text */
+.shimmer-text {
+  background: linear-gradient(120deg, rgba(180,255,238,0.92), rgba(120,248,214,0.72), rgba(255,255,255,0.95));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 24px 60px rgba(var(--brand-deep), 0.28)) drop-shadow(0 0 18px rgba(var(--brand-primary), 0.38));
+  animation: shimmerPulse 3.2s ease-in-out infinite;
+}
+
+/* Neon button with glowing border */
+.btn-neon {
+  position: relative;
+  color: #fff;
+  background: linear-gradient(145deg, rgba(var(--brand-primary), 0.95), rgba(var(--brand-primary), 0.8));
+  border: 1px solid rgba(var(--brand-primary), 0.35);
+  box-shadow: 0 8px 24px rgba(6, 20, 38, 0.24), 0 0 30px rgba(var(--brand-primary), 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+}
+.btn-neon::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from 180deg at 50% 50%, rgba(var(--brand-primary), 0.1), rgba(var(--brand-primary), 0.6), rgba(var(--brand-primary), 0.1));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.btn-neon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 36px rgba(14, 38, 70, 0.3), 0 0 36px rgba(var(--brand-primary), 0.45);
+}
+.btn-neon:hover::before { opacity: 0.95; }
+
+/* Accent edge for cards */
+.accent-edge {
+  position: relative;
+}
+.accent-edge::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(var(--brand-primary), 0), rgba(var(--brand-primary), 0.8), rgba(var(--brand-primary), 0));
+  border-radius: 2px;
+  filter: drop-shadow(0 0 10px rgba(var(--brand-primary), 0.35));
+}
+
+/* Keyframes */
+@keyframes gradientShift {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.22; }
+  50% { transform: translate3d(-2%, 2%, 0) scale(1.04); opacity: 0.28; }
+  100% { transform: translate3d(1%, -1%, 0) scale(1.02); opacity: 0.24; }
+}
+
+@keyframes shimmerPulse {
+  0%, 100% { filter: drop-shadow(0 24px 60px rgba(var(--brand-deep), 0.28)) drop-shadow(0 0 18px rgba(var(--brand-primary), 0.35)); }
+  50% { filter: drop-shadow(0 32px 80px rgba(var(--brand-deep), 0.38)) drop-shadow(0 0 26px rgba(var(--brand-primary), 0.55)); }
+}
+
+/* Orange headline variant with lighter shadows for cleaner background */
+.headline-orange {
+  background: linear-gradient(120deg, #FFE0B2 0%, #FFB74D 45%, #FB8C00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* keep shadows subtle to avoid background getting dirty */
+  text-shadow: 0 1px 2px rgba(10, 26, 47, 0.12);
 }
