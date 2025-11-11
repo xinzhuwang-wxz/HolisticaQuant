@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   BarChart3,
   LineChart,
-  ClipboardList,
 } from 'lucide-react'
 import { fetchResearchTemplates, getWebSocketBase, runQuery } from '../lib/apiClient'
 import type {
@@ -660,10 +659,6 @@ const ResearchLab: React.FC = () => {
       .filter(Boolean)
   }, [apiResult?.report, buildFallbackReport, inputValues, selectedTemplate])
 
-  const baseAssumptionsText = useMemo(() => {
-    if (!selectedTemplate) return ''
-    return formatInputSummary(selectedTemplate, inputValues)
-  }, [formatInputSummary, inputValues, selectedTemplate])
   const scenarioBadges = useMemo(() => {
     if (!selectedTemplate) return []
     const badges: { label: string; value: string }[] = []
