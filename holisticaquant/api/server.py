@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Header
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError
@@ -17,6 +19,9 @@ from holisticaquant.memory.scenario_repository import (
     load_scenario_library,
 )
 from holisticaquant.utils.llm_factory import create_llm
+
+# 用户API密钥存储（内存字典，key为session_id）
+_user_api_keys: Dict[str, Dict[str, str]] = {}
 
 
 class QueryRequest(BaseModel):
@@ -37,6 +42,19 @@ class QueryRequest(BaseModel):
         default=None,
         description="可选上下文，未提供时将自动注入 trigger_time",
     )
+
+
+class ApiKeyConfigRequest(BaseModel):
+    """API密钥配置请求"""
+
+    keys: Dict[str, str] = Field(..., description="API密钥字典，格式：{'doubao': 'key', 'chatgpt': 'key', ...}")
+
+
+class ApiKeyConfigResponse(BaseModel):
+    """API密钥配置响应"""
+
+    configured_providers: List[str] = Field(..., description="已配置的提供商列表")
+    using_builtin: bool = Field(..., description="是否使用内置密钥")
 
 
 class QueryResponse(BaseModel):
@@ -92,7 +110,26 @@ def _markdown_to_readable(text: str) -> str:
     return "\n".join(cleaned).strip()
 
 
-async def _execute_query(graph: HolisticaGraph, payload: QueryRequest) -> QueryResponse:
+def _get_user_api_keys(session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
+    """
+    获取用户API密钥
+    
+    Args:
+        session_id: 会话ID（从请求头获取）
+        
+    Returns:
+        用户API密钥字典，如果不存在则返回None
+    """
+    if session_id and session_id in _user_api_keys:
+        return _user_api_keys[session_id]
+    return None
+
+
+async def _execute_query(
+    graph: HolisticaGraph, 
+    payload: QueryRequest,
+    user_api_keys: Optional[Dict[str, str]] = None
+) -> QueryResponse:
     if graph is None:
         raise RuntimeError("Graph not initialized")
 
@@ -375,10 +412,26 @@ def _build_learning_timeline_events(response: QueryResponse) -> List[Dict[str, s
 
 def build_application() -> FastAPI:
     app = FastAPI(title="HolisticaQuant API", version="0.1.0")
-
+    
+    # 获取部署模式
+    config = get_config().config
+    deployment_mode = config.get("deployment_mode", "development")
+    
+    # CORS配置：生产环境限制允许的域名
+    if deployment_mode == "production":
+        # 生产环境：从环境变量读取允许的域名
+        allowed_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+        allowed_origins = [origin.strip() for origin in allowed_origins if origin.strip()]
+        if not allowed_origins:
+            # 如果没有配置，默认允许所有（不推荐，但为了快速上线）
+            allowed_origins = ["*"]
+    else:
+        # 开发环境：允许所有
+        allowed_origins = ["*"]
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -412,14 +465,90 @@ def build_application() -> FastAPI:
     async def list_research_templates() -> Dict[str, Any]:
         return {"templates": get_research_templates()}
 
+    @app.post("/api/config/keys", response_model=ApiKeyConfigResponse)
+    async def set_api_keys(
+        payload: ApiKeyConfigRequest,
+        x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
+    ) -> ApiKeyConfigResponse:
+        """
+        设置用户API密钥
+        
+        如果提供了X-Session-Id请求头，则使用该ID；否则生成新的session ID
+        """
+        session_id = x_session_id or str(uuid4())
+        
+        # 验证密钥格式（简单验证：非空字符串）
+        valid_keys = {}
+        for provider, api_key in payload.keys.items():
+            if api_key and isinstance(api_key, str) and api_key.strip():
+                valid_keys[provider] = api_key.strip()
+        
+        if valid_keys:
+            _user_api_keys[session_id] = valid_keys
+        
+        # 检查是否有内置密钥可用
+        builtin_keys = get_config().get_builtin_api_keys()
+        has_builtin = any(builtin_keys.values())
+        
+        return ApiKeyConfigResponse(
+            configured_providers=list(valid_keys.keys()),
+            using_builtin=not valid_keys and has_builtin
+        )
+
+    @app.get("/api/config/keys", response_model=ApiKeyConfigResponse)
+    async def get_api_keys_status(
+        x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
+    ) -> ApiKeyConfigResponse:
+        """
+        获取当前API密钥配置状态（不返回实际密钥）
+        """
+        user_keys = _get_user_api_keys(x_session_id) if x_session_id else None
+        builtin_keys = get_config().get_builtin_api_keys()
+        has_builtin = any(builtin_keys.values())
+        
+        configured_providers = list(user_keys.keys()) if user_keys else []
+        
+        return ApiKeyConfigResponse(
+            configured_providers=configured_providers,
+            using_builtin=not user_keys and has_builtin
+        )
+
+    @app.delete("/api/config/keys")
+    async def clear_api_keys(
+        x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
+    ) -> Dict[str, str]:
+        """
+        清除用户API密钥
+        """
+        if x_session_id and x_session_id in _user_api_keys:
+            del _user_api_keys[x_session_id]
+        
+        return {"status": "cleared"}
+
     @app.post("/api/query", response_model=QueryResponse)
-    async def run_query(payload: QueryRequest) -> QueryResponse:
+    async def run_query(
+        payload: QueryRequest,
+        request: Request,
+        x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
+    ) -> QueryResponse:
         graph: HolisticaGraph = getattr(app.state, "graph", None)
         if graph is None:  # pragma: no cover - 理论不会出现
             raise HTTPException(status_code=503, detail="Graph not initialized")
 
+        # 获取用户API密钥
+        user_api_keys = _get_user_api_keys(x_session_id) if x_session_id else None
+        
+        # 如果用户提供了密钥，需要重新创建LLM和graph
+        if user_api_keys:
+            config = get_config()
+            updated_config = config.get_provider_config_with_keys(user_api_keys)
+            # 创建新的LLM实例（使用用户密钥）
+            llm = create_llm(provider=payload.provider, config=updated_config)
+            # 创建新的graph实例
+            graph = HolisticaGraph(llm=llm, config=updated_config)
+
         try:
-            return await _execute_query(graph, payload)
+            return await _execute_query(graph, payload, user_api_keys)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -480,6 +609,11 @@ def build_application() -> FastAPI:
 
         forward_task = asyncio.create_task(forward_progress())
 
+        # 获取用户API密钥（从WebSocket查询参数或消息中）
+        user_api_keys = None
+        # 注意：WebSocket不支持请求头，可以通过查询参数传递session_id
+        # 这里简化处理，如果需要可以从payload.context中获取
+        
         try:
             context_with_queue = payload.context.copy() if payload.context else {}
             if progress_queue is not None:
@@ -487,7 +621,7 @@ def build_application() -> FastAPI:
             payload = payload.model_copy(update={"context": context_with_queue})
 
             await websocket.send_json({"type": "status", "message": "已接收任务，正在调度 AI 工作流……"})
-            response = await _execute_query(graph, payload)
+            response = await _execute_query(graph, payload, user_api_keys)
             
             # 最终内容已准备好，立即停止流式输出
             final_content_ready.set()
