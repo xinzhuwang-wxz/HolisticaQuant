@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Key, CheckCircle2, AlertCircle } from 'lucide-react';
-import { getApiKeysStatus, setApiKeys, clearApiKeys, getSessionId } from '../lib/apiClient';
+import { getApiKeysStatus, setApiKeys, clearApiKeys } from '../lib/apiClient';
 
 interface ApiKeySettingsProps {
   isOpen: boolean;
