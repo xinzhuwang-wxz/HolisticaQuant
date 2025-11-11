@@ -890,7 +890,7 @@ class BaseAgent(ABC):
                         tool_summaries = []
                         for tool_name, tool_result in tool_results.items():
                             # 进一步截断工具结果摘要，只保留关键信息
-                            summary_length = min(500, len(tool_result))  # 每个工具结果最多500字符摘要
+                            summary_length = min(300, len(tool_result))  # 每个工具结果最多300字符摘要（从500降到300）
                             summary = tool_result[:summary_length]
                             if len(tool_result) > summary_length:
                                 summary += f"\n...（已截断，完整结果共 {len(tool_result)} 字符）"
@@ -976,22 +976,37 @@ class BaseAgent(ABC):
                         if self.debug and len(text_content) < original_length:
                             logger.debug(f"{self.name}: 清理思考过程标记后，长度从 {original_length} 变为 {len(text_content)}")
                     
-                    # 如果文本报告为空，记录详细错误并抛出异常（不使用默认值）
+                    # 如果文本报告为空，尝试回退方案
                     if not text_content or not text_content.strip():
-                        error_msg = (
-                            f"{self.name}: 文本报告生成结果为空！\n"
-                            f"  - 原始content: {report_result.content if hasattr(report_result, 'content') else 'N/A'}\n"
-                            f"  - 清理后content: {text_content}\n"
-                            f"  - LLM类型: {type(report_result)}\n"
-                            f"  - 工具调用结果数量: {len(tool_results) if tool_results else 0}\n"
-                            f"  - 工具调用结果: {list(tool_results.keys()) if tool_results else []}\n"
-                        )
-                        if hasattr(report_result, 'response_metadata'):
-                            error_msg += f"  - response_metadata: {report_result.response_metadata}\n"
-                        if hasattr(report_result, 'finish_reason'):
-                            error_msg += f"  - finish_reason: {report_result.finish_reason}\n"
-                        logger.error(error_msg)
-                        raise ValueError(f"{self.name}: 文本报告生成失败，LLM返回空内容。请检查工具调用结果和LLM配置。")
+                        # 回退方案1：使用 final_result.content（如果存在）
+                        if hasattr(final_result, 'content') and final_result.content and final_result.content.strip():
+                            text_content = final_result.content.strip()
+                            if self.debug:
+                                logger.info(f"{self.name}: 文本报告为空，使用 final_result.content 作为回退")
+                        # 回退方案2：使用工具结果摘要（如果存在）
+                        elif tool_results:
+                            tool_summaries = []
+                            for tool_name, tool_result in tool_results.items():
+                                summary_length = min(200, len(tool_result))
+                                summary = tool_result[:summary_length]
+                                if len(tool_result) > summary_length:
+                                    summary += f"\n...（已截断，完整结果共 {len(tool_result)} 字符）"
+                                tool_summaries.append(f"**{tool_name}**:\n{summary}")
+                            text_content = "\n\n".join(tool_summaries)
+                            if self.debug:
+                                logger.warning(f"{self.name}: 文本报告为空，使用工具结果摘要作为临时内容")
+                        # 如果所有回退方案都失败，记录警告但不抛出异常（因为工具调用可能已成功）
+                        if not text_content or not text_content.strip():
+                            warning_msg = (
+                                f"{self.name}: 文本报告生成结果为空，但工具调用可能已成功\n"
+                                f"  - 原始content: {report_result.content if hasattr(report_result, 'content') else 'N/A'}\n"
+                                f"  - 清理后content: {text_content}\n"
+                                f"  - 工具调用结果数量: {len(tool_results) if tool_results else 0}\n"
+                                f"  - 工具调用结果: {list(tool_results.keys()) if tool_results else []}\n"
+                            )
+                            logger.warning(warning_msg)
+                            # 生成一个最小化的占位内容，避免后续处理失败
+                            text_content = f"数据收集完成。已调用工具: {', '.join(tool_results.keys()) if tool_results else '无'}"
                     
                     if self.debug:
                         logger.info(f"{self.name}: 文本报告生成成功，长度: {len(text_content)}")
@@ -1009,7 +1024,21 @@ class BaseAgent(ABC):
             
             # 8. 如果没有使用structured output，使用传统方式获取文本内容
             if not use_structured_output:
-                text_content = final_result.content if hasattr(final_result, 'content') else str(final_result)
+                if not text_content or not text_content.strip():
+                    # 如果 text_content 为空，尝试从 final_result 获取
+                    text_content = final_result.content if hasattr(final_result, 'content') else str(final_result)
+                    # 如果仍然为空但有工具调用结果，使用工具结果摘要
+                    if (not text_content or not text_content.strip()) and tool_results:
+                        tool_summaries = []
+                        for tool_name, tool_result in tool_results.items():
+                            summary_length = min(200, len(tool_result))
+                            summary = tool_result[:summary_length]
+                            if len(tool_result) > summary_length:
+                                summary += f"\n...（已截断，完整结果共 {len(tool_result)} 字符）"
+                            tool_summaries.append(f"**{tool_name}**:\n{summary}")
+                        text_content = "\n\n".join(tool_summaries)
+                        if self.debug:
+                            logger.warning(f"{self.name}: text_content为空，使用工具结果摘要作为回退")
             
             # 9. 处理结果
             updates = self._process_result(state, structured_data, text_content, tool_results)

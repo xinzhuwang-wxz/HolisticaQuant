@@ -142,10 +142,13 @@ export interface DataAnalysisSummary {
 export interface StrategySummary {
   updated_at?: string
   recommendation?: string
-  confidence?: string
+  confidence?: string | number
   target_price?: string
   position_suggestion?: string
   time_horizon?: string
+  entry_conditions?: string[]
+  exit_conditions?: string[]
+  rationale?: string
   report_preview?: string
   highlights?: string[]
   full_report?: string

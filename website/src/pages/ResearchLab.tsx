@@ -558,12 +558,19 @@ const ResearchLab: React.FC = () => {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as { type: string; [key: string]: any }
+          // 如果已经收到最终内容，停止处理流式事件
+          if (finalReceived && data.type !== 'final' && data.type !== 'error') {
+            return
+          }
+          
           if (data.type === 'status') {
             pushTimelineEvent('进度更新', data.message)
           } else if (data.type === 'timeline') {
             pushTimelineEvent(data.title, data.content)
           } else if (data.type === 'final') {
             finalReceived = true
+            // 立即停止流式输出
+            stopTypewriter()
             const response = data.payload as QueryResponse
             applyFinalResponse(response, selectedTemplate)
             socket.close()
@@ -1088,16 +1095,34 @@ const ResearchLab: React.FC = () => {
                         )}
 
                         {metadataSnapshot.strategy?.recommendation && (
-                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 space-y-2">
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 space-y-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
                               <Sparkles className="w-4 h-4" />
                               最终投资建议
                             </div>
-                            <p className="text-sm text-emerald-900">
-                              建议：{metadataSnapshot.strategy.recommendation}
-                              {metadataSnapshot.strategy.target_price ? `｜目标价：${metadataSnapshot.strategy.target_price}` : ''}
-                              {metadataSnapshot.strategy.confidence ? `｜置信度：${metadataSnapshot.strategy.confidence}` : ''}
-                            </p>
+                            <div className="space-y-2">
+                              <p className="text-sm text-emerald-900">
+                                建议：{metadataSnapshot.strategy.recommendation}
+                                {metadataSnapshot.strategy.target_price ? `｜目标价：${metadataSnapshot.strategy.target_price}` : ''}
+                                {metadataSnapshot.strategy.confidence ? `｜置信度：${metadataSnapshot.strategy.confidence}` : ''}
+                                {metadataSnapshot.strategy.position_suggestion ? `｜仓位：${metadataSnapshot.strategy.position_suggestion}` : ''}
+                                {metadataSnapshot.strategy.time_horizon ? `｜周期：${metadataSnapshot.strategy.time_horizon}` : ''}
+                              </p>
+                              {metadataSnapshot.strategy.entry_conditions && Array.isArray(metadataSnapshot.strategy.entry_conditions) && metadataSnapshot.strategy.entry_conditions.length > 0 && (
+                                <div className="text-xs text-emerald-800">
+                                  <span className="font-medium">入场条件：</span>
+                                  {metadataSnapshot.strategy.entry_conditions.slice(0, 3).join('；')}
+                                  {metadataSnapshot.strategy.entry_conditions.length > 3 ? `等${metadataSnapshot.strategy.entry_conditions.length}项` : ''}
+                                </div>
+                              )}
+                              {metadataSnapshot.strategy.exit_conditions && Array.isArray(metadataSnapshot.strategy.exit_conditions) && metadataSnapshot.strategy.exit_conditions.length > 0 && (
+                                <div className="text-xs text-emerald-800">
+                                  <span className="font-medium">出场条件：</span>
+                                  {metadataSnapshot.strategy.exit_conditions.slice(0, 3).join('；')}
+                                  {metadataSnapshot.strategy.exit_conditions.length > 3 ? `等${metadataSnapshot.strategy.exit_conditions.length}项` : ''}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 

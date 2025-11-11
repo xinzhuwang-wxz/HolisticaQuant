@@ -110,6 +110,11 @@ class GlobalConfig:
                     "quality_threshold": float(os.getenv("QUALITY_THRESHOLD", "0.6")),
                     "max_retries": int(os.getenv("MAX_RETRIES", "1")),
                 },
+                "data_sufficiency": {
+                    "min_confidence": float(os.getenv("DATA_SUFFICIENCY_MIN_CONFIDENCE", "0.6")),
+                    "min_tools_called": int(os.getenv("DATA_SUFFICIENCY_MIN_TOOLS", "2")),
+                    "early_stop": os.getenv("DATA_SUFFICIENCY_EARLY_STOP", "true").lower() == "true",
+                },
             },
             
             # 工具路由配置

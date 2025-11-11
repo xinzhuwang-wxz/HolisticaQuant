@@ -650,12 +650,19 @@ const LearningStudio: React.FC = () => {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as StreamMessage
+          // 如果已经收到最终内容，停止处理流式事件
+          if (finalReceived && data.type !== 'final' && data.type !== 'error') {
+            return
+          }
+          
           if (data.type === 'status') {
             pushTimelineEvent('进度更新', data.message)
           } else if (data.type === 'timeline') {
             pushTimelineEvent(data.title, data.content)
           } else if (data.type === 'final') {
             finalReceived = true
+            // 立即停止流式输出
+            stopTypewriter()
             const response = data.payload
             setTaskResult(response.report.trim())
             const workshopMeta = (response.metadata?.learning_workshop ?? null) as LearningWorkshopMetadata | null

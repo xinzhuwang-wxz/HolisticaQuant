@@ -132,6 +132,63 @@ class LearningWorkshopAgent(BaseAgent):
             "learning_objectives": data.get("learning_objectives", []),
         }
 
+        # 实时推送学习工坊事件
+        progress_queue = None
+        try:
+            progress_queue = state.get("context", {}).get("_progress_queue")
+        except Exception:
+            progress_queue = None
+
+        if progress_queue:
+            try:
+                # 推送"知识点"事件
+                knowledge_point = data.get("knowledge_point", "")
+                if knowledge_point:
+                    progress_queue.put_nowait({
+                        "type": "timeline",
+                        "title": "知识点",
+                        "content": knowledge_point,
+                    })
+
+                # 推送"学习目标"事件
+                learning_objectives = data.get("learning_objectives", [])
+                if learning_objectives:
+                    progress_queue.put_nowait({
+                        "type": "timeline",
+                        "title": "学习目标",
+                        "content": _as_bullets(learning_objectives),
+                    })
+
+                # 推送"任务步骤"事件
+                task_steps = data.get("task_steps", [])
+                if task_steps:
+                    progress_queue.put_nowait({
+                        "type": "timeline",
+                        "title": "任务步骤",
+                        "content": _as_bullets(task_steps),
+                    })
+
+                # 推送"验证逻辑"事件
+                validation_logic = data.get("validation_logic", "")
+                if validation_logic:
+                    progress_queue.put_nowait({
+                        "type": "timeline",
+                        "title": "验证逻辑",
+                        "content": validation_logic,
+                    })
+
+                # 推送"AI 指导"事件
+                ai_guidance = data.get("ai_guidance", "")
+                if ai_guidance:
+                    progress_queue.put_nowait({
+                        "type": "timeline",
+                        "title": "AI 指导",
+                        "content": ai_guidance,
+                    })
+            except Exception as exc:
+                if self.debug:
+                    logger.warning(f"learning_workshop_agent: 推送进度事件失败: {exc}")
+
         output_summary = f"学习场景: {data['scenario_id']} - {data['knowledge_point']}"
 
         return {

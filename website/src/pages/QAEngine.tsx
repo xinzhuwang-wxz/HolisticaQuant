@@ -17,6 +17,7 @@ interface Message {
   timestamp: Date
   segments?: { title: string; content?: string }[]
   isStreaming?: boolean
+  finalReport?: string // 场景3的最终报告文本
 }
 
 interface AssistantReply {
@@ -28,6 +29,7 @@ interface AssistantReply {
     nextActions: string[]
     dataSources: string[]
   }
+  finalReport?: string // 最终报告文本（QueryResponse.report）
 }
 
 const QAEngine: React.FC = () => {
@@ -135,6 +137,7 @@ const QAEngine: React.FC = () => {
           nextActions: assistantMeta.recommended_next_actions ?? [],
           dataSources: assistantMeta.data_sources ?? [],
         },
+        finalReport: response.report || undefined, // 保存最终报告
       }
     }
 
@@ -146,6 +149,7 @@ const QAEngine: React.FC = () => {
         nextActions: [],
         dataSources: [],
       },
+      finalReport: response.report || undefined,
     }
   }
 
@@ -272,6 +276,7 @@ const QAEngine: React.FC = () => {
                 content: '',
                 data: reply.data,
                 segments: msg.segments,
+                finalReport: reply.finalReport, // 保存最终报告
                 isStreaming: true,
               }
             : msg
@@ -321,6 +326,11 @@ const QAEngine: React.FC = () => {
       socket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data) as { type: string; [key: string]: any }
+          // 如果已经收到最终内容，停止处理流式事件
+          if (finalReceived && data.type !== 'final' && data.type !== 'error') {
+            return
+          }
+          
           if (data.type === 'status') {
             if (data.message) {
               appendStreamSegment('状态', data.message)
@@ -329,6 +339,17 @@ const QAEngine: React.FC = () => {
             appendStreamSegment(data.title ?? '进度', data.content)
           } else if (data.type === 'final') {
             finalReceived = true
+            // 立即停止流式输出，设置isStreaming为false
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantPlaceholder.id
+                  ? {
+                      ...msg,
+                      isStreaming: false,
+                    }
+                  : msg
+              )
+            )
             const response = data.payload as QueryResponse
             handleFinal(buildAssistantReply(response))
             setIsTyping(false)
@@ -426,6 +447,7 @@ const QAEngine: React.FC = () => {
           content: '',
           data: reply.data,
           segments,
+          finalReport: reply.finalReport, // 保存最终报告
           timestamp: new Date(),
         }
 
@@ -547,6 +569,18 @@ const QAEngine: React.FC = () => {
                                         )}
                                       </div>
                                     ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 场景3的最终报告pad，显示在流式输出下方 */}
+                              {message.finalReport && (
+                                <div className="mt-4 pt-4 border-t-2 border-primary-300/50">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-500/70 mb-2">
+                                    最终报告
+                                  </div>
+                                  <div className="text-sm leading-relaxed whitespace-pre-line text-gray-700 bg-primary-50/50 p-4 rounded-lg border border-primary-200/50">
+                                    {message.finalReport}
                                   </div>
                                 </div>
                               )}

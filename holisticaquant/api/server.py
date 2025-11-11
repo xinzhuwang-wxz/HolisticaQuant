@@ -229,24 +229,25 @@ def _build_learning_timeline_events(response: QueryResponse) -> List[Dict[str, s
 
         data_summary = metadata.get("data_analysis_summary") if isinstance(metadata, dict) else None
         if isinstance(data_summary, dict) and data_summary:
-            collected = data_summary.get("tools")
-            if isinstance(collected, list) and collected:
-                lines = []
-                for item in collected:
-                    name = item.get("name")
-                    summary = item.get("latest_summary")
-                    if name and summary:
-                        readable = _markdown_to_readable(str(summary))
-                        max_len = 240
-                        if len(readable) > max_len:
-                            readable = readable[: max_len - 1].rstrip() + "…"
-                        lines.append(f"• {name}：{readable}")
-                if lines:
-                    events.append({
-                        "type": "timeline",
-                        "title": "数据收集",
-                        "content": "\n".join(lines),
-                    })
+            # 移除"数据收集"事件的构建，流式输出时不再输出工具原始内容
+            # collected = data_summary.get("tools")
+            # if isinstance(collected, list) and collected:
+            #     lines = []
+            #     for item in collected:
+            #         name = item.get("name")
+            #         summary = item.get("latest_summary")
+            #         if name and summary:
+            #             readable = _markdown_to_readable(str(summary))
+            #             max_len = 240
+            #             if len(readable) > max_len:
+            #                 readable = readable[: max_len - 1].rstrip() + "…"
+            #             lines.append(f"• {name}：{readable}")
+            #     if lines:
+            #         events.append({
+            #             "type": "timeline",
+            #             "title": "数据收集",
+            #             "content": "\n".join(lines),
+            #         })
             preview = data_summary.get("analysis_preview") or data_summary.get("full_report")
             if preview:
                 readable_preview = _markdown_to_readable(str(preview))
@@ -269,12 +270,50 @@ def _build_learning_timeline_events(response: QueryResponse) -> List[Dict[str, s
             recommendation = strategy_summary.get("recommendation")
             target_price = strategy_summary.get("target_price")
             confidence = strategy_summary.get("confidence")
+            position_suggestion = strategy_summary.get("position_suggestion")
+            time_horizon = strategy_summary.get("time_horizon")
+            entry_conditions = strategy_summary.get("entry_conditions")
+            exit_conditions = strategy_summary.get("exit_conditions")
+            
             if recommendation or target_price or confidence:
-                summary_parts = [
-                    f"建议：{recommendation}" if recommendation else "",
-                    f"目标价：{target_price}" if target_price else "",
-                    f"置信度：{confidence}" if confidence else "",
-                ]
+                summary_parts = []
+                # 转换recommendation为中文
+                if recommendation:
+                    rec_map = {"buy": "买入", "sell": "卖出", "hold": "持有", "analyze": "分析"}
+                    rec_display = rec_map.get(str(recommendation).lower(), recommendation)
+                    summary_parts.append(f"建议：{rec_display}")
+                
+                if target_price:
+                    summary_parts.append(f"目标价：{target_price}")
+                
+                if confidence is not None:
+                    try:
+                        if isinstance(confidence, (int, float)):
+                            summary_parts.append(f"置信度：{confidence:.0%}")
+                        else:
+                            summary_parts.append(f"置信度：{confidence}")
+                    except Exception:
+                        summary_parts.append(f"置信度：{confidence}")
+                
+                if position_suggestion:
+                    summary_parts.append(f"仓位：{position_suggestion}")
+                
+                if time_horizon:
+                    summary_parts.append(f"周期：{time_horizon}")
+                
+                # 添加入场和出场条件（如果存在）
+                if entry_conditions and isinstance(entry_conditions, list) and len(entry_conditions) > 0:
+                    entry_str = "；".join(entry_conditions[:2])  # 最多显示2个
+                    if len(entry_conditions) > 2:
+                        entry_str += f"等{len(entry_conditions)}项"
+                    summary_parts.append(f"入场：{entry_str}")
+                
+                if exit_conditions and isinstance(exit_conditions, list) and len(exit_conditions) > 0:
+                    exit_str = "；".join(exit_conditions[:2])  # 最多显示2个
+                    if len(exit_conditions) > 2:
+                        exit_str += f"等{len(exit_conditions)}项"
+                    summary_parts.append(f"出场：{exit_str}")
+                
                 summary = "｜".join([part for part in summary_parts if part])
                 if summary:
                     title = "策略完成"
@@ -299,30 +338,37 @@ def _build_learning_timeline_events(response: QueryResponse) -> List[Dict[str, s
 
         return events
 
-    learning_meta = metadata.get("learning_workshop") if isinstance(metadata, dict) else None
-    if isinstance(learning_meta, dict):
-        knowledge_point = learning_meta.get("knowledge_point")
-        if knowledge_point:
-            events.append({"type": "timeline", "title": "知识点", "content": str(knowledge_point)})
+    # learning_workshop 场景的最终事件构建
+    if response.scenario_type == "learning_workshop":
+        learning_meta = metadata.get("learning_workshop") if isinstance(metadata, dict) else None
+        if isinstance(learning_meta, dict):
+            knowledge_point = learning_meta.get("knowledge_point")
+            if knowledge_point:
+                events.append({"type": "timeline", "title": "知识点", "content": str(knowledge_point)})
 
-    plan = response.plan if isinstance(response.plan, dict) else {}
-    if plan:
-        plan_summary = plan.get("intent") or plan.get("summary")
-        if plan_summary:
-            events.append({"type": "timeline", "title": "规划完成", "content": str(plan_summary)})
+        plan = response.plan if isinstance(response.plan, dict) else {}
+        if plan:
+            plan_summary = plan.get("intent") or plan.get("summary")
+            if plan_summary:
+                events.append({"type": "timeline", "title": "规划完成", "content": str(plan_summary)})
 
-    sections = _extract_report_sections(response.report or "")
-    section_mapping = (
-        ("学习目标", "学习目标"),
-        ("微型任务步骤", "任务步骤"),
-        ("验证逻辑", "验证逻辑"),
-        ("AI 指导", "AI 指导"),
-    )
+        sections = _extract_report_sections(response.report or "")
+        section_mapping = (
+            ("学习目标", "学习目标"),
+            ("微型任务步骤", "任务步骤"),
+            ("验证逻辑", "验证逻辑"),
+            ("AI 指导", "AI 指导"),
+        )
 
-    for key, title in section_mapping:
-        content = sections.get(key)
-        if content:
-            events.append({"type": "timeline", "title": title, "content": content})
+        for key, title in section_mapping:
+            content = sections.get(key)
+            if content:
+                events.append({"type": "timeline", "title": title, "content": content})
+
+    # assistant 场景：不构建最终事件，因为已经实时推送了所有内容
+    # 避免流式输出和最终结果混在一起
+    if response.scenario_type == "assistant":
+        return events
 
     return events
 
@@ -404,17 +450,33 @@ def build_application() -> FastAPI:
 
         progress_queue: asyncio.Queue | None = asyncio.Queue()
         progress_titles_streamed: Dict[str, int] = {}
+        final_content_ready = asyncio.Event()  # 标记最终内容是否已准备好
 
         async def forward_progress() -> None:
             if progress_queue is None:
                 return
             while True:
-                item = await progress_queue.get()
-                if item is None:
+                # 如果最终内容已准备好，停止流式输出
+                if final_content_ready.is_set():
+                    # 清空队列中剩余的事件（因为最终内容已经准备好了）
+                    while not progress_queue.empty():
+                        try:
+                            progress_queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
                     break
-                title = str(item.get("title", ""))
-                progress_titles_streamed[title] = progress_titles_streamed.get(title, 0) + 1
-                await websocket.send_json(item)
+                
+                try:
+                    # 使用超时等待，以便能够检查 final_content_ready 状态
+                    item = await asyncio.wait_for(progress_queue.get(), timeout=0.1)
+                    if item is None:
+                        break
+                    title = str(item.get("title", ""))
+                    progress_titles_streamed[title] = progress_titles_streamed.get(title, 0) + 1
+                    await websocket.send_json(item)
+                except asyncio.TimeoutError:
+                    # 超时后继续检查 final_content_ready
+                    continue
 
         forward_task = asyncio.create_task(forward_progress())
 
@@ -426,21 +488,36 @@ def build_application() -> FastAPI:
 
             await websocket.send_json({"type": "status", "message": "已接收任务，正在调度 AI 工作流……"})
             response = await _execute_query(graph, payload)
+            
+            # 最终内容已准备好，立即停止流式输出
+            final_content_ready.set()
         except WebSocketDisconnect:
             return
         except Exception as exc:  # pragma: no cover - 执行异常
+            final_content_ready.set()  # 即使出错也要停止流式输出
             await websocket.send_json({"type": "error", "message": str(exc)})
             await websocket.close()
             return
         finally:
+            # 停止流式输出
             if progress_queue is not None:
                 progress_queue.put_nowait(None)
-            await forward_task
+            # 等待流式输出任务完成（最多等待1秒）
+            try:
+                await asyncio.wait_for(forward_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                forward_task.cancel()
+                try:
+                    await forward_task
+                except asyncio.CancelledError:
+                    pass
 
         try:
             for event in _build_learning_timeline_events(response):
                 title = str(event.get("title", ""))
-                if title in {"数据收集", "数据分析"} and progress_titles_streamed.get(title):
+                # 如果已经实时推送过，跳过（避免重复）
+                # 检查 progress_titles_streamed 中是否已经存在该标题（支持动态标题如"行业快照完成"）
+                if progress_titles_streamed.get(title):
                     continue
                 await websocket.send_json(event)
             await websocket.send_json({"type": "final", "payload": jsonable_encoder(response)})

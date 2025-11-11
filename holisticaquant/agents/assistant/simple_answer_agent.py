@@ -41,7 +41,8 @@ class SimpleAnswerAgent(BaseAgent):
 
     def _get_system_message(self) -> str:
         return (
-            "你是AI智能陪伴导师，回答用户的问题并提供数据、逻辑与来源。"
+            "我是你的投研助手，会同时给出结论、数据来源和推理过程。想了解哪家公司的投资问题，我可以帮你分析。\n\n"
+            "回答用户的问题并提供数据、逻辑与来源。"
             "必须输出AssistantAnswerSchema定义的JSON，禁止输出额外文本。"
         )
 
@@ -125,25 +126,28 @@ class SimpleAnswerAgent(BaseAgent):
 
         if progress_queue:
             try:
-                question = state.get("query", "")
-                if question:
+                # 推送"回答"事件（包含场景、回答、支撑要点，因为report中已经包含了这些）
+                # 不单独推送"场景"和"要点梳理"，避免重复
+                answer = data.get("answer", "")
+                if answer:
                     progress_queue.put_nowait(
                         {
                             "type": "timeline",
-                            "title": "解析问题",
-                            "content": question,
+                            "title": "回答",
+                            "content": answer,
                         }
                     )
 
-                supporting = data.get("supporting_points") or []
-                if supporting:
-                    progress_queue.put_nowait(
-                        {
-                            "type": "timeline",
-                            "title": "要点梳理",
-                            "content": _as_bullets(supporting),
-                        }
-                    )
+                # 移除"要点梳理"事件的推送，因为report中的"回答"部分已经包含了【支撑要点】
+                # supporting = data.get("supporting_points") or []
+                # if supporting:
+                #     progress_queue.put_nowait(
+                #         {
+                #             "type": "timeline",
+                #             "title": "要点梳理",
+                #             "content": _as_bullets(supporting),
+                #         }
+                #     )
 
                 data_sources = data.get("data_sources") or []
                 if data_sources:

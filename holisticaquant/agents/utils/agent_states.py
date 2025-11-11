@@ -86,7 +86,7 @@ def create_empty_state(query: str, context: Dict[str, Any], config: Optional[Dic
         "messages": [],
         "trace": [],
         "errors": [],
-        "metadata": {},
+        "metadata": {"config": config},  # 保存配置供条件判断函数使用
     }
 
 

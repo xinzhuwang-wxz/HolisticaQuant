@@ -86,6 +86,12 @@ class DataAnalyst(BaseAgent):
             "- **禁止调用web_search**：此agent没有web_search工具，不要尝试调用。如果尝试调用会报错。\n"
             "- **禁止调用任何未列出的工具**：只使用上述5个工具。\n\n"
             "策略：有tickers→优先主动工具；无tickers→使用被动工具。\n\n"
+            "**报告长度要求**：\n"
+            "- 报告总长度控制在800-1200字以内\n"
+            "- 宏观分析：200-300字\n"
+            "- 微观分析：300-400字\n"
+            "- 结论和关键发现：200-300字\n"
+            "- 数据概览：简要列出关键数据点即可\n\n"
             "报告：宏观分析、微观分析、数据支撑结论。输出数据充分性评估JSON。"
         )
     
@@ -105,10 +111,14 @@ class DataAnalyst(BaseAgent):
         
         import json
         iteration_info = ""
+        cache_check_msg = ""
         if collection_iteration > 0:
             iteration_info = f"\n\n这是第 {collection_iteration + 1} 次数据收集迭代。"
             if existing_data:
-                iteration_info += f"\n已收集的数据源：{list(existing_data.keys())}"
+                existing_tools = list(existing_data.keys())
+                iteration_info += f"\n已收集的数据源：{existing_tools}"
+                # 添加缓存检查提示，避免重复调用
+                cache_check_msg = f"\n\n**重要**：已收集的数据源：{', '.join(existing_tools)}。不要重复调用已收集过的工具，除非需要更新数据。优先调用尚未收集的数据源。"
         
         # 检查失败的工具并生成降级建议
         tool_suggestion_msg = ""
@@ -119,7 +129,7 @@ class DataAnalyst(BaseAgent):
                 if self.debug:
                     logger.info(f"data_analyst: 检测到失败工具: {failing_tools}")
         
-        return f"""计划：{json.dumps(plan, ensure_ascii=False, indent=2)}{iteration_info}{tool_suggestion_msg}
+        return f"""计划：{json.dumps(plan, ensure_ascii=False, indent=2)}{iteration_info}{cache_check_msg}{tool_suggestion_msg}
 
 执行：1)根据plan收集数据 2)分析（宏观+微观）3)生成报告（数据概览、宏观分析、微观分析、结论、关键发现）4)评估数据充分性（输出JSON）。
 
@@ -168,19 +178,36 @@ class DataAnalyst(BaseAgent):
         # 转换为字典
         data_sufficiency = structured_data.model_dump()
         
-        # 提取文本报告（如果为空，直接报错，不使用默认值）
+        # 提取文本报告（如果为空，尝试使用工具结果摘要）
         if text_content is None or not text_content.strip():
-            error_msg = (
-                f"data_analyst: 文本报告为空！\n"
-                f"  - text_content: {text_content}\n"
-                f"  - 工具调用结果数量: {len(tool_results) if tool_results else 0}\n"
-                f"  - 工具调用结果: {list(tool_results.keys()) if tool_results else []}\n"
-                f"  - 结构化数据: {structured_data}\n"
-            )
-            logger.error(error_msg)
-            raise ValueError("data_analyst: 文本报告生成失败，LLM返回空内容。请检查工具调用结果和LLM配置。")
-        
-        analysis_report = text_content.strip()
+            # 如果工具调用成功，使用工具结果摘要生成临时报告
+            if tool_results:
+                tool_summaries = []
+                for tool_name, tool_result in tool_results.items():
+                    summary_length = min(300, len(tool_result))
+                    summary = tool_result[:summary_length]
+                    if len(tool_result) > summary_length:
+                        summary += f"\n...（已截断，完整结果共 {len(tool_result)} 字符）"
+                    tool_summaries.append(f"**{tool_name}**:\n{summary}")
+                analysis_report = "## 数据收集概览\n\n" + "\n\n".join(tool_summaries)
+                warning_msg = (
+                    f"data_analyst: 文本报告为空，但工具调用已成功，使用工具结果摘要作为临时报告\n"
+                    f"  - 工具调用结果数量: {len(tool_results)}\n"
+                    f"  - 工具调用结果: {list(tool_results.keys())}\n"
+                )
+                logger.warning(warning_msg)
+            else:
+                # 如果没有工具调用结果，记录警告但不抛出异常
+                warning_msg = (
+                    f"data_analyst: 文本报告为空且无工具调用结果\n"
+                    f"  - text_content: {text_content}\n"
+                    f"  - 结构化数据: {structured_data}\n"
+                )
+                logger.warning(warning_msg)
+                # 生成最小化占位内容
+                analysis_report = "数据收集完成，但未能生成详细分析报告。"
+        else:
+            analysis_report = text_content.strip()
         
         if self.debug:
             logger.debug(f"data_analyst: 文本报告长度: {len(analysis_report)}")
@@ -217,28 +244,30 @@ class DataAnalyst(BaseAgent):
                 tool_summary_lines.append(f"- **{tool_name}**：{result}")
 
         # 若存在进度队列，推送实时事件
+        # 注意：不再推送"数据收集"事件（工具原始内容），只推送"数据分析"事件（总结报告）
         progress_queue = None
         try:
             progress_queue = state.get("context", {}).get("_progress_queue")
         except Exception:
             progress_queue = None
 
-        if tool_summary_lines and progress_queue:
-            try:
-                summary_plain = []
-                for line in tool_summary_lines:
-                    plain = line.replace("- **", "• ").replace("**：", "：").replace("**", "")
-                    summary_plain.append(plain)
-                progress_queue.put_nowait(
-                    {
-                        "type": "timeline",
-                        "title": "数据收集",
-                        "content": "\n".join(summary_plain),
-                    }
-                )
-            except Exception as exc:
-                if self.debug:
-                    logger.warning(f"data_analyst: 推送数据收集进度失败: {exc}")
+        # 移除"数据收集"事件的推送，只保留"数据分析"事件
+        # if tool_summary_lines and progress_queue:
+        #     try:
+        #         summary_plain = []
+        #         for line in tool_summary_lines:
+        #             plain = line.replace("- **", "• ").replace("**：", "：").replace("**", "")
+        #             summary_plain.append(plain)
+        #         progress_queue.put_nowait(
+        #             {
+        #                 "type": "timeline",
+        #                 "title": "数据收集",
+        #                 "content": "\n".join(summary_plain),
+        #             }
+        #         )
+        #     except Exception as exc:
+        #         if self.debug:
+        #             logger.warning(f"data_analyst: 推送数据收集进度失败: {exc}")
 
         # 将工具摘要附加到分析报告（避免重复添加）
         if tool_summary_lines and "### 数据收集概览" not in analysis_report:
@@ -277,10 +306,12 @@ class DataAnalyst(BaseAgent):
             try:
                 analysis_excerpt = analysis_report.strip()
                 if analysis_excerpt:
+                    # 清理markdown标记
                     analysis_excerpt = analysis_excerpt.replace("###", "").replace("**", "")
-                    max_len = 420
+                    # 设置1500字符的阈值，超过则截断
+                    max_len = 1500
                     if len(analysis_excerpt) > max_len:
-                        analysis_excerpt = analysis_excerpt[: max_len - 1].rstrip() + "…"
+                        analysis_excerpt = analysis_excerpt[:max_len].rstrip() + "..."
                     progress_queue.put_nowait(
                         {
                             "type": "timeline",

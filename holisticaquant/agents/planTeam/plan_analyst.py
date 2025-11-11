@@ -69,7 +69,8 @@ class PlanAnalyst(BaseAgent):
             "- time_range/intent/data_sources/focus_areas 按以往规范返回。\n\n"
             "如果用户提到具体经济数据练习、课程作业或投研报告，则倾向于research_lab；\n"
             "如果用户明确要学知识点、做实验任务，倾向于learning_workshop；\n"
-            "如果只是问问题或需要解释，选择assistant。"
+            "如果只是问问题、需要解释、询问估值或投资建议（如\"XX估值是否偏高\"、\"XX值得投资吗\"），选择assistant。\n"
+            "注意：简单的投资问题（如\"XX估值是否偏高\"、\"XX值得投资吗\"）应该选择assistant，而不是research_lab。"
         )
 
     def _get_user_input(self, state: AgentState, memory_context: str = "") -> str:
@@ -227,6 +228,39 @@ class PlanAnalyst(BaseAgent):
         
         if self.debug:
             logger.info(f"plan_analyst: 计划生成成功 - {output_summary}")
+
+        # 实时推送"规划完成"事件
+        progress_queue = None
+        try:
+            progress_queue = state.get("context", {}).get("_progress_queue")
+        except Exception:
+            progress_queue = None
+
+        if progress_queue:
+            try:
+                # 构建规划完成的内容
+                plan_content_parts = []
+                if plan_dict.get("intent"):
+                    plan_content_parts.append(plan_dict["intent"])
+                elif plan_dict.get("summary"):
+                    plan_content_parts.append(plan_dict["summary"])
+                
+                if scenario_type == "research_lab":
+                    if plan_dict.get("tickers"):
+                        plan_content_parts.append(f"目标股票: {', '.join(plan_dict['tickers'])}")
+                    if plan_dict.get("time_range"):
+                        plan_content_parts.append(f"时间范围: {plan_dict['time_range']}")
+                
+                plan_content = "\n".join(plan_content_parts) if plan_content_parts else output_summary
+                
+                progress_queue.put_nowait({
+                    "type": "timeline",
+                    "title": "规划完成",
+                    "content": plan_content,
+                })
+            except Exception as exc:
+                if self.debug:
+                    logger.warning(f"plan_analyst: 推送规划完成进度失败: {exc}")
 
         return {
             "tickers": plan_dict["tickers"],  # 顶层维护tickers
