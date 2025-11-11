@@ -59,3 +59,30 @@ htmlcov/
 *.tmp
 .cache/
 
+# 媒体文件（大文件）
+*.mp4
+*.avi
+*.mov
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# 模型和数据文件（如果存在）
+*.pkl
+*.h5
+*.pt
+*.pth
+*.bin
+*.model
+*.db
+*.sqlite
+*.sqlite3
+
+# 临时和备份文件
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
