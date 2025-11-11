@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, BarChart3, MessageSquare } from 'lucide-react';
+import { ArrowRight, Sparkles, BarChart3, MessageSquare, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ApiKeySettings from '../components/ApiKeySettings';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const [showApiSettings, setShowApiSettings] = useState(false);
 
   const scenarios = [
     {
@@ -53,7 +55,15 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
+              className="flex items-center space-x-3"
             >
+              <button
+                onClick={() => setShowApiSettings(true)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors flex items-center space-x-2"
+              >
+                <Settings className="w-4 h-4" />
+                <span>API设置</span>
+              </button>
               <button className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
                 API Docs
               </button>
@@ -277,6 +287,12 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* API密钥设置弹窗 */}
+      <ApiKeySettings
+        isOpen={showApiSettings}
+        onClose={() => setShowApiSettings(false)}
+      />
     </div>
   );
 };

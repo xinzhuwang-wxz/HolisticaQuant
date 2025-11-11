@@ -49,7 +49,7 @@ class GlobalConfig:
                         "enabled": True,
                         "priority": 1,
                         "base_url": os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"),
-                        "api_key": os.getenv("DOUBAO_API_KEY"),
+                        "api_key": os.getenv("DOUBAO_API_KEY") or os.getenv("BUILTIN_DOUBAO_API_KEY"),
                         "model": os.getenv("DOUBAO_MODEL", "doubao-pro-4k"),
                     },
                     # ChatGPT (OpenAI)
@@ -57,7 +57,7 @@ class GlobalConfig:
                         "enabled": True,
                         "priority": 2,
                         "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-                        "api_key": os.getenv("OPENAI_API_KEY"),
+                        "api_key": os.getenv("OPENAI_API_KEY") or os.getenv("BUILTIN_OPENAI_API_KEY"),
                         "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                     },
                     # Claude (Anthropic)
@@ -65,7 +65,7 @@ class GlobalConfig:
                         "enabled": True,
                         "priority": 3,
                         "base_url": os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
-                        "api_key": os.getenv("ANTHROPIC_API_KEY"),
+                        "api_key": os.getenv("ANTHROPIC_API_KEY") or os.getenv("BUILTIN_ANTHROPIC_API_KEY"),
                         "model": os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
                     },
                     # DeepSeek
@@ -73,7 +73,7 @@ class GlobalConfig:
                         "enabled": True,
                         "priority": 4,
                         "base_url": os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-                        "api_key": os.getenv("DEEPSEEK_API_KEY"),
+                        "api_key": os.getenv("DEEPSEEK_API_KEY") or os.getenv("BUILTIN_DEEPSEEK_API_KEY"),
                         "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
                     },
                 },
@@ -158,6 +158,9 @@ class GlobalConfig:
             # 项目路径
             "project_root": str(PROJECT_ROOT),
             "debug": os.getenv("DEBUG", "false").lower() == "true",
+            
+            # 部署模式
+            "deployment_mode": os.getenv("DEPLOYMENT_MODE", "development"),
         }
     
     def _apply_env_overrides(self):
@@ -257,6 +260,44 @@ class GlobalConfig:
             available_providers.sort(key=lambda x: x[0])
         
         return available_providers[0][2]  # 返回配置字典
+    
+    def get_builtin_api_keys(self) -> Dict[str, Optional[str]]:
+        """
+        获取内置API密钥（用于默认共享）
+        
+        Returns:
+            包含各提供商内置密钥的字典
+        """
+        return {
+            "doubao": os.getenv("BUILTIN_DOUBAO_API_KEY"),
+            "chatgpt": os.getenv("BUILTIN_OPENAI_API_KEY"),
+            "claude": os.getenv("BUILTIN_ANTHROPIC_API_KEY"),
+            "deepseek": os.getenv("BUILTIN_DEEPSEEK_API_KEY"),
+        }
+    
+    def get_provider_config_with_keys(
+        self, 
+        user_keys: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        获取LLM提供商配置，支持用户自定义密钥覆盖
+        
+        Args:
+            user_keys: 用户自定义的API密钥字典，格式：{"doubao": "key", ...}
+            
+        Returns:
+            更新后的LLM配置字典
+        """
+        config = self._config.copy()
+        providers = config.get("llm", {}).get("providers", {})
+        
+        # 如果提供了用户密钥，优先使用用户密钥
+        if user_keys:
+            for provider_name, api_key in user_keys.items():
+                if provider_name in providers and api_key:
+                    providers[provider_name]["api_key"] = api_key
+        
+        return config
     
     @property
     def config(self) -> Dict[str, Any]:

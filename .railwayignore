@@ -1,0 +1,88 @@
+# Railway 构建忽略文件
+# 这些文件/目录在构建时不会被复制，加快构建速度
+
+# Node.js 依赖（前端构建时会重新安装）
+website/node_modules/
+website/dist/
+website/.vite/
+
+# Python 缓存和虚拟环境
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+.venv/
+venv/
+env/
+
+# 开发文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 文档和媒体文件（可选，如果不需要可以排除）
+docs/video.mp4
+docs/*.md
+!docs/DEPLOYMENT.md
+
+# 数据缓存（运行时生成）
+holisticaquant/dataflows/datasource/data_cache/
+
+# Git 相关
+.git/
+.gitignore
+
+# 测试文件
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 其他
+*.log
+*.tmp
+.cache/
+
+# 媒体文件（大文件）
+*.mp4
+*.avi
+*.mov
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# 模型和数据文件（如果存在）
+*.pkl
+*.h5
+*.pt
+*.pth
+*.bin
+*.model
+*.db
+*.sqlite
+*.sqlite3
+
+# 临时和备份文件
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
