@@ -1,12 +1,9 @@
-# HolisticaQuant 依赖包
+# HolisticaQuant 部署依赖包（轻量版）
+# 不包含sentence-transformers（仅在Agentic RAG启用时需要，默认禁用）
 
 # 核心依赖
 pandas>=2.0.0
 numpy>=1.24.0
-
-# 网站依赖
-streamlit>=1.30.0
-matplotlib>=3.8.0
 
 # LangChain相关
 langchain>=0.1.0
@@ -20,7 +17,6 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.24.0
 
 # 数据源依赖
-# akshare - 用于获取市场数据和资金流数据
 akshare>=1.12.0
 
 # 网络请求
@@ -33,22 +29,16 @@ loguru>=0.7.0
 # 环境变量管理
 python-dotenv>=1.0.0
 
-# 测试依赖
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-
-# 其他工具
-pathlib2>=2.3.7; python_version < "3.4"
-
 # 异步工具
-nest_asyncio>=1.5.0  # 用于处理嵌套事件循环
+nest_asyncio>=1.5.0
 
-# 搜索工具（可选，用于web_search）
-# 注意：duckduckgo-search已重命名为ddgs
-ddgs>=0.1.0
+# 搜索工具
+ddgs>=0.9.0
 
+# 数据验证
 pydantic>=2.0.0
 
-# RAG向量服务
-sentence-transformers>=2.7.0
+# 注意：sentence-transformers仅在启用Agentic RAG时需要
+# 如果需要启用Agentic RAG，请安装：pip install sentence-transformers>=2.7.0
+# 但会增加镜像大小（约4GB+）
 

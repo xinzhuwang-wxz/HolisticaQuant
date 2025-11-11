@@ -1,5 +1,7 @@
 [build]
 builder = "railpack"
+# 跳过默认的requirements.txt安装，直接使用轻量版
+installCommand = "python -m venv /app/.venv"
 buildCommand = "pip install --no-cache-dir -r requirements-deploy.txt"
 
 [deploy]
