@@ -1,0 +1,44 @@
+# HolisticaQuant 部署依赖包（轻量版）
+# 不包含sentence-transformers（仅在Agentic RAG启用时需要，默认禁用）
+
+# 核心依赖
+pandas>=2.0.0
+numpy>=1.24.0
+
+# LangChain相关
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-openai>=0.0.5
+langchain-anthropic>=0.1.0
+langgraph>=0.0.30
+
+# API框架
+fastapi>=0.115.0
+uvicorn[standard]>=0.24.0
+
+# 数据源依赖
+akshare>=1.12.0
+
+# 网络请求
+aiohttp>=3.9.0
+requests>=2.31.0
+
+# 日志
+loguru>=0.7.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# 异步工具
+nest_asyncio>=1.5.0
+
+# 搜索工具
+ddgs>=0.9.0
+
+# 数据验证
+pydantic>=2.0.0
+
+# 注意：sentence-transformers仅在启用Agentic RAG时需要
+# 如果需要启用Agentic RAG，请安装：pip install sentence-transformers>=2.7.0
+# 但会增加镜像大小（约4GB+）
+
