@@ -6,6 +6,10 @@
 
 </div>
 
+https://chinaxiv.org/abs/202512.00066V1
+
+</div>
+
 ## 场景概览
 
 - **Landing Page 三大体验卡**
